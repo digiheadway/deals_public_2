@@ -1,0 +1,499 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Plus, Home, Globe, User, Map, List, LogOut, ChevronDown } from 'lucide-react';
+import { PropertyCard } from './components/PropertyCard';
+import { PropertyModal } from './components/PropertyModal';
+import { PropertyDetailsModal } from './components/PropertyDetailsModal';
+import { ContactModal } from './components/ContactModal';
+import { PropertyMap } from './components/PropertyMap';
+import { SearchFilter } from './components/SearchFilter';
+import { Toast } from './components/Toast';
+import { useAuth } from './contexts/AuthContext';
+import { propertyApi } from './services/api';
+import { Property, PropertyFormData, FilterOptions } from './types/property';
+
+type FilterType = 'all' | 'my' | 'public';
+type ViewType = 'list' | 'map';
+
+interface ToastState {
+  message: string;
+  type: 'success' | 'error';
+}
+
+function App() {
+  const { ownerId, setOwnerId } = useAuth();
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [viewType, setViewType] = useState<ViewType>('list');
+  const [myProperties, setMyProperties] = useState<Property[]>([]);
+  const [publicProperties, setPublicProperties] = useState<Property[]>([]);
+  const [allProperties, setAllProperties] = useState<Property[]>([]);
+  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilters, setActiveFilters] = useState<FilterOptions>({});
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
+
+  const loadMyProperties = useCallback(async () => {
+    try {
+      const data = await propertyApi.getUserProperties(ownerId);
+      setMyProperties(data);
+    } catch (error) {
+      showToast('Failed to load properties', 'error');
+    }
+  }, [ownerId]);
+
+  const loadPublicProperties = useCallback(async () => {
+    try {
+      const data = await propertyApi.getPublicProperties(ownerId);
+      setPublicProperties(data);
+    } catch (error) {
+      showToast('Failed to load public properties', 'error');
+    }
+  }, [ownerId]);
+
+  const loadAllProperties = useCallback(async () => {
+    try {
+      const data = await propertyApi.getAllProperties(ownerId);
+      setAllProperties(data);
+    } catch (error) {
+      showToast('Failed to load all properties', 'error');
+    }
+  }, [ownerId]);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([loadMyProperties(), loadPublicProperties(), loadAllProperties()]).then(() => {
+      setLoading(false);
+    });
+  }, [loadMyProperties, loadPublicProperties, loadAllProperties]);
+
+  useEffect(() => {
+    let propertiesToDisplay: Property[] = [];
+
+    if (activeFilter === 'all') {
+      propertiesToDisplay = allProperties;
+    } else if (activeFilter === 'my') {
+      propertiesToDisplay = myProperties;
+    } else if (activeFilter === 'public') {
+      propertiesToDisplay = publicProperties;
+    }
+
+    setFilteredProperties(propertiesToDisplay);
+  }, [activeFilter, allProperties, myProperties, publicProperties]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
+        setShowFilterMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  };
+
+  const handleAddProperty = async (data: PropertyFormData) => {
+    try {
+      await propertyApi.addProperty(ownerId, data);
+      showToast('Property added successfully', 'success');
+      setShowModal(false);
+      loadMyProperties();
+    } catch (error) {
+      showToast('Failed to add property', 'error');
+    }
+  };
+
+  const handleEditProperty = async (data: PropertyFormData) => {
+    if (!editingProperty) return;
+    try {
+      await propertyApi.updateProperty(editingProperty.id, ownerId, data);
+      showToast('Property updated successfully', 'success');
+      setShowModal(false);
+      setEditingProperty(null);
+      setShowDetailsModal(false);
+      loadMyProperties();
+    } catch (error) {
+      showToast('Failed to update property', 'error');
+    }
+  };
+
+  const handleDeleteProperty = async (id: number) => {
+    try {
+      await propertyApi.deleteProperty(id, ownerId);
+      showToast('Property deleted successfully', 'success');
+      setShowDetailsModal(false);
+      setSelectedProperty(null);
+      loadMyProperties();
+    } catch (error) {
+      showToast('Failed to delete property', 'error');
+    }
+  };
+
+  const handleTogglePublic = async (id: number, isPublic: boolean) => {
+    try {
+      await propertyApi.updateProperty(id, ownerId, { is_public: isPublic ? 1 : 0 });
+      showToast(`Property made ${isPublic ? 'public' : 'private'}`, 'success');
+      loadMyProperties();
+      if (selectedProperty?.id === id) {
+        setSelectedProperty({ ...selectedProperty, is_public: isPublic ? 1 : 0 });
+      }
+    } catch (error) {
+      showToast('Failed to update property', 'error');
+    }
+  };
+
+  const handleShare = async (property: Property) => {
+    const sizeText = property.min_size === property.size_max
+      ? `${property.min_size} ${property.size_unit}`
+      : `${property.min_size}-${property.size_max} ${property.size_unit}`;
+    const priceText = property.price_min === property.price_max
+      ? `₹${property.price_min} Lakhs`
+      : `₹${property.price_min}-${property.price_max} Lakhs`;
+    const text = `${property.type} in ${property.area}, ${property.city}\n${property.description}\nSize: ${sizeText}\nPrice: ${priceText}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${property.type} - ${property.area}`,
+          text,
+        });
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          showToast('Failed to share', 'error');
+        }
+      }
+    } else {
+      navigator.clipboard.writeText(text);
+      showToast('Property details copied to clipboard', 'success');
+    }
+  };
+
+  const handleSearch = useCallback(
+    async (query: string) => {
+      setSearchQuery(query);
+      if (!query.trim()) {
+        if (activeFilter === 'all') {
+          setFilteredProperties(allProperties);
+        } else if (activeFilter === 'my') {
+          setFilteredProperties(myProperties);
+        } else if (activeFilter === 'public') {
+          setFilteredProperties(publicProperties);
+        }
+        return;
+      }
+
+      try {
+        const results = await propertyApi.searchProperties(query);
+        let filtered = results;
+
+        if (activeFilter === 'my') {
+          filtered = results.filter((p) => p.owner_id === ownerId);
+        } else if (activeFilter === 'public') {
+          filtered = results.filter((p) => p.owner_id !== ownerId && p.is_public === 1);
+        }
+
+        setFilteredProperties(filtered);
+      } catch (error) {
+        showToast('Search failed', 'error');
+      }
+    },
+    [activeFilter, allProperties, myProperties, publicProperties, ownerId]
+  );
+
+  const handleFilter = useCallback(
+    async (filters: FilterOptions) => {
+      setActiveFilters(filters);
+      if (Object.keys(filters).length === 0) {
+        if (activeFilter === 'all') {
+          setFilteredProperties(allProperties);
+        } else if (activeFilter === 'my') {
+          setFilteredProperties(myProperties);
+        } else if (activeFilter === 'public') {
+          setFilteredProperties(publicProperties);
+        }
+        return;
+      }
+
+      try {
+        const results = await propertyApi.filterProperties(filters);
+        let filtered = results;
+
+        if (activeFilter === 'my') {
+          filtered = results.filter((p) => p.owner_id === ownerId);
+        } else if (activeFilter === 'public') {
+          filtered = results.filter((p) => p.owner_id !== ownerId && p.is_public === 1);
+        }
+
+        setFilteredProperties(filtered);
+      } catch (error) {
+        showToast('Filter failed', 'error');
+      }
+    },
+    [activeFilter, allProperties, myProperties, publicProperties, ownerId]
+  );
+
+  const handleFilterChange = (filter: FilterType) => {
+    setActiveFilter(filter);
+    setSearchQuery('');
+    setActiveFilters({});
+    setShowFilterMenu(false);
+  };
+
+  const handleUserIdChange = () => {
+    const newId = prompt('Enter Owner ID:', ownerId.toString());
+    if (newId && !isNaN(parseInt(newId))) {
+      setOwnerId(parseInt(newId));
+      showToast(`Switched to user ${newId}`, 'success');
+    }
+  };
+
+  const handleViewProperty = (property: Property) => {
+    setSelectedProperty(property);
+    setShowDetailsModal(true);
+  };
+
+  const handleAskQuestion = (property: Property) => {
+    setSelectedProperty(property);
+    setShowContactModal(true);
+  };
+
+  const handleContactSubmit = (message: string, phone: string) => {
+    showToast('Question sent via WhatsApp!', 'success');
+  };
+
+  const currentProperties = filteredProperties;
+
+  const getFilterLabel = () => {
+    if (activeFilter === 'all') return 'All Properties';
+    if (activeFilter === 'my') return 'My Properties';
+    return 'Public Properties';
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-20">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <Home className="w-6 h-6 text-blue-600" />
+              <h1 className="text-xl font-bold text-gray-900">PropNetwork</h1>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="relative" ref={filterMenuRef}>
+                <button
+                  onClick={() => setShowFilterMenu(!showFilterMenu)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all bg-white border border-gray-300 hover:bg-gray-50 text-gray-700"
+                >
+                  <Globe className="w-5 h-5" />
+                  <span className="hidden sm:inline text-sm">{getFilterLabel()}</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showFilterMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showFilterMenu && (
+                  <div className="absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    <button
+                      onClick={() => handleFilterChange('all')}
+                      className={`w-full px-4 py-3 text-left text-sm transition-colors ${
+                        activeFilter === 'all'
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        <span>All Properties</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleFilterChange('my')}
+                      className={`w-full px-4 py-3 text-left text-sm transition-colors ${
+                        activeFilter === 'my'
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Home className="w-4 h-4" />
+                        <span>My Properties</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleFilterChange('public')}
+                      className={`w-full px-4 py-3 text-left text-sm transition-colors ${
+                        activeFilter === 'public'
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        <span>Public Properties</span>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <SearchFilter
+          onSearch={handleSearch}
+          onFilter={handleFilter}
+          viewType={viewType}
+          onViewChange={setViewType}
+        />
+
+
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className={`animate-fade-in ${viewType === 'map' ? 'hidden lg:block' : ''}`}>
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </div>
+            ) : currentProperties.length === 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                <p className="text-gray-500">
+                  {activeFilter === 'my' ? 'No properties yet. Add your first property!' : 'No properties available'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {currentProperties.map((property) => (
+                  <PropertyCard
+                    key={property.id}
+                    property={property}
+                    isOwned={property.owner_id === ownerId}
+                    onViewDetails={handleViewProperty}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className={`h-[600px] lg:block animate-fade-in ${viewType === 'list' ? 'hidden lg:block' : ''}`}>
+            <PropertyMap properties={currentProperties} />
+          </div>
+        </div>
+      </div>
+
+      {showModal && (
+        <PropertyModal
+          property={editingProperty}
+          onClose={() => {
+            setShowModal(false);
+            setEditingProperty(null);
+          }}
+          onSubmit={editingProperty ? handleEditProperty : handleAddProperty}
+        />
+      )}
+
+      {showDetailsModal && selectedProperty && (
+        <PropertyDetailsModal
+          property={selectedProperty}
+          isOwned={selectedProperty.owner_id === ownerId}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedProperty(null);
+          }}
+          onEdit={(p) => {
+            setEditingProperty(p);
+            setShowDetailsModal(false);
+            setShowModal(true);
+          }}
+          onDelete={handleDeleteProperty}
+          onTogglePublic={handleTogglePublic}
+          onShare={handleShare}
+          onAskQuestion={handleAskQuestion}
+        />
+      )}
+
+      {showContactModal && selectedProperty && (
+        <ContactModal
+          property={selectedProperty}
+          ownerPhone="9518091945"
+          senderId={ownerId}
+          onClose={() => {
+            setShowContactModal(false);
+            setSelectedProperty(null);
+          }}
+          onSubmit={handleContactSubmit}
+        />
+      )}
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      <button
+        onClick={() => {
+          setEditingProperty(null);
+          setShowModal(true);
+        }}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center z-40 hover:scale-110 duration-200"
+        title="Add Property"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
+
+      <footer className="bg-white border-t border-gray-200 py-4 px-4 mt-12">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-gray-600" />
+            <span className="text-sm text-gray-700">
+              Logged in as <span className="font-semibold text-blue-600">User {ownerId}</span>
+            </span>
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium"
+              title="User menu"
+            >
+              Switch User
+            </button>
+
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <button
+                  onClick={() => {
+                    handleUserIdChange();
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Switch User ID
+                </button>
+                <button
+                  onClick={() => {
+                    setOwnerId(1);
+                    setShowUserMenu(false);
+                    showToast('Logged out', 'success');
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
