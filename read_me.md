@@ -143,7 +143,6 @@ if ($action === 'add_property') {
 
     $owner_id = intval($data['owner_id'] ?? 0);
     if ($owner_id <= 0) { echo json_encode(["error" => "owner_id not provided"]); exit; }
-
     $city = clean($data['city'] ?? '');
     $area = clean($data['area'] ?? '');
     $type = clean($data['type'] ?? '');

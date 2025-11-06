@@ -211,8 +211,8 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-3xl max-h-[98vh] sm:max-h-[90vh] overflow-y-auto animate-slide-up">
-        <div className="z-10 sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-6 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
+        <div className="z-10 sticky top-0 bg-white border-b border-gray-200 px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between rounded-t-2xl">
+          <h2 className="text-base sm:text-lg font-bold text-gray-900">
             {property ? 'Edit Property' : 'Add Property'}
           </h2>
           <button
@@ -223,26 +223,26 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
               }
               onClose();
             }}
-            className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
           >
-            <X className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-gray-500" />
+            <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 md:p-8 space-y-3 sm:space-y-4 md:space-y-6">
+        <form onSubmit={handleSubmit} className="p-3 sm:p-4 space-y-2.5 sm:space-y-3">
           <div>
-            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-gray-700">
                 Area/Address
               </label>
               <div className="relative" ref={cityDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setShowCityDropdown(!showCityDropdown)}
-                  className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm text-gray-700 hover:text-gray-900 inline-flex items-center gap-0.5"
+                  className="px-2 py-1 text-xs text-gray-700 hover:text-gray-900 inline-flex items-center gap-0.5"
                 >
                   <span>{currentCityLabel}</span>
-                  <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showCityDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-2.5 h-2.5 text-gray-500 transition-transform ${showCityDropdown ? 'rotate-180' : ''}`} />
                 </button>
                 {showCityDropdown && (
                   <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 min-w-[120px]">
@@ -256,7 +256,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                           setFormData(prev => ({ ...prev, city: option.value }));
                           setShowCityDropdown(false);
                         }}
-                        className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-50 transition-colors ${
+                        className={`w-full px-2.5 sm:px-3 py-1.5 text-left text-xs hover:bg-gray-50 transition-colors ${
                           formData.city === option.value
                             ? 'bg-blue-50 text-blue-700 font-medium'
                             : 'text-gray-700'
@@ -280,11 +280,11 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 }}
                 onFocus={() => setShowAreaSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowAreaSuggestions(false), 200)}
-                className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 pr-8 sm:pr-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
+                className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 pr-7 sm:pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400"
                 placeholder="Sector 18"
                 required
               />
-              <MapPin className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+              <MapPin className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               {showAreaSuggestions && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                   {AREA_OPTIONS.filter(area =>
@@ -297,7 +297,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                         setFormData(prev => ({ ...prev, area }));
                         setShowAreaSuggestions(false);
                       }}
-                      className="w-full px-4 py-2 text-left hover:bg-blue-50 text-sm text-gray-700"
+                      className="w-full px-3 py-1.5 text-left hover:bg-blue-50 text-xs text-gray-700"
                     >
                       {area}
                     </button>
@@ -308,19 +308,19 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
           </div>
 
           <div>
-            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
               Property type
             </label>
             <div className="relative" ref={propertyTypeDropdownRef}>
               <button
                 type="button"
                 onClick={() => setShowPropertyTypeDropdown(!showPropertyTypeDropdown)}
-                className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 bg-white hover:bg-gray-50 transition-colors flex items-center justify-between ${
+                className={`w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 bg-white hover:bg-gray-50 transition-colors flex items-center justify-between ${
                   !formData.type ? 'text-gray-400' : 'text-gray-900'
                 }`}
               >
                 <span>{currentPropertyTypeLabel}</span>
-                <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showPropertyTypeDropdown ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${showPropertyTypeDropdown ? 'rotate-180' : ''}`} />
               </button>
               {showPropertyTypeDropdown && (
                 <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
@@ -334,7 +334,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                         setFormData(prev => ({ ...prev, type: option.value }));
                         setShowPropertyTypeDropdown(false);
                       }}
-                      className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-50 transition-colors ${
+                      className={`w-full px-2.5 sm:px-3 py-1.5 text-left text-xs hover:bg-gray-50 transition-colors ${
                         formData.type === option.value
                           ? 'bg-blue-50 text-blue-700 font-medium'
                           : 'text-gray-700'
@@ -349,9 +349,9 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <Ruler className="w-3.5 h-3.5 text-gray-500" />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                <Ruler className="w-3 h-3 text-gray-500" />
                 <span>Size (in </span>
                 <span className="relative inline-block" ref={sizeUnitDropdownRef}>
                   <button
@@ -360,7 +360,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                     className="text-gray-700 hover:text-gray-900 inline-flex items-center gap-0.5"
                   >
                     <span>{currentSizeUnitLabel}</span>
-                    <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showSizeUnitDropdown ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-2.5 h-2.5 text-gray-500 transition-transform ${showSizeUnitDropdown ? 'rotate-180' : ''}`} />
                   </button>
                   {showSizeUnitDropdown && (
                     <div className="absolute left-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 min-w-[120px]">
@@ -374,7 +374,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                             setFormData(prev => ({ ...prev, size_unit: option.value as any }));
                             setShowSizeUnitDropdown(false);
                           }}
-                          className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-50 transition-colors ${
+                          className={`w-full px-2.5 sm:px-3 py-1.5 text-left text-xs hover:bg-gray-50 transition-colors ${
                             formData.size_unit === option.value
                               ? 'bg-blue-50 text-blue-700 font-medium'
                               : 'text-gray-700'
@@ -391,19 +391,19 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
               <button
                 type="button"
                 onClick={() => setShowSizeRange(!showSizeRange)}
-                className="text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-700"
+                className="text-xs font-medium text-gray-600 hover:text-gray-700"
               >
                 {sizeRangeButtonText}
               </button>
             </div>
             {showSizeRange ? (
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <input
                   type="number"
                   name="min_size"
                   value={formData.min_size !== undefined && formData.min_size !== null ? formData.min_size : ''}
                   onChange={handleChange}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
+                  className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400"
                   placeholder="100"
                   step="0.01"
                   required
@@ -413,7 +413,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                   name="size_max"
                   value={formData.size_max !== undefined && formData.size_max !== null ? formData.size_max : ''}
                   onChange={handleChange}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
+                  className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400"
                   placeholder="200"
                   step="0.01"
                   required
@@ -426,7 +426,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                   name="min_size"
                   value={formData.min_size !== undefined && formData.min_size !== null ? formData.min_size : ''}
                   onChange={handleChange}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
+                  className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400"
                   placeholder="150"
                   step="0.01"
                   required
@@ -436,27 +436,27 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <IndianRupee className="w-3.5 h-3.5 text-gray-500" />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                <IndianRupee className="w-3 h-3 text-gray-500" />
                 Price (in lakhs)
               </label>
               <button
                 type="button"
                 onClick={() => setShowPriceRange(!showPriceRange)}
-                className="text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-700"
+                className="text-xs font-medium text-gray-600 hover:text-gray-700"
               >
                 {priceRangeButtonText}
               </button>
             </div>
             {showPriceRange ? (
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <input
                   type="number"
                   name="price_min"
                   value={formData.price_min !== undefined && formData.price_min !== null ? formData.price_min : ''}
                   onChange={handleChange}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
+                  className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400"
                   placeholder="20"
                   step="0.01"
                   required
@@ -466,7 +466,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                   name="price_max"
                   value={formData.price_max !== undefined && formData.price_max !== null ? formData.price_max : ''}
                   onChange={handleChange}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
+                  className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400"
                   placeholder="30"
                   step="0.01"
                   required
@@ -479,7 +479,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                   name="price_min"
                   value={formData.price_min !== undefined && formData.price_min !== null ? formData.price_min : ''}
                   onChange={handleChange}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
+                  className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400"
                   placeholder="1 Crore = 100 Lakhs"
                   step="0.01"
                   required
@@ -490,41 +490,41 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
           </div>
 
           <div>
-            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2 flex items-center gap-2">
-              <FileText className="w-3.5 h-3.5 text-gray-500" />
+            <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+              <FileText className="w-3 h-3 text-gray-500" />
               Description
             </label>
             <textarea
               name="description"
               value={formData.description}
               onChange={handleChange}
-              rows={4}
-              className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400 resize-none"
+              rows={3}
+              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 resize-none"
               placeholder="Add Detailed Property description Here"
             />
-            <p className="text-xs text-gray-500 mt-1">like dimensions, built-up age, nearby landmarks, facing direction, etc</p>
+            <p className="text-xs text-gray-500 mt-0.5">like dimensions, built-up age, nearby landmarks, facing direction, etc</p>
           </div>
 
           <div>
-            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2 flex items-center gap-2">
-              <FileText className="w-3.5 h-3.5 text-gray-500" />
+            <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+              <FileText className="w-3 h-3 text-gray-500" />
               Private notes <span className="text-xs text-gray-500 normal-case">(Only for you)</span>
             </label>
             <textarea
               name="note_private"
               value={formData.note_private}
               onChange={handleChange}
-              rows={3}
-              className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400 resize-none"
+              rows={2}
+              className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400 resize-none"
               placeholder="Personal notes"
             />
-            <p className="text-xs text-gray-500 mt-1">Add private details like plot number, deal price, owner info, etc</p>
+            <p className="text-xs text-gray-500 mt-0.5">Add private details like plot number, deal price, owner info, etc</p>
           </div>
 
-          <div className="pt-2 border-t border-gray-200">
-            <div className="flex items-center justify-between gap-3">
+          <div className="pt-1.5 border-t border-gray-200">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex-1">
-                <span className="text-xs sm:text-sm font-semibold text-gray-900">Privacy</span>
+                <span className="text-xs font-semibold text-gray-900">Privacy</span>
                 <p className="text-xs text-gray-500 leading-relaxed mt-0.5">
                   {formData.is_public === 1 
                     ? 'This property is visible to everyone' 
@@ -534,7 +534,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
               <button
                 type="button"
                 onClick={() => setFormData((prev) => ({ ...prev, is_public: prev.is_public === 1 ? 0 : 1 }))}
-                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                className={`flex items-center gap-1 px-1.5 py-1 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
                   formData.is_public === 1 
                     ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' 
                     : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
@@ -544,22 +544,22 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 <div className="flex items-center gap-1">
                   {formData.is_public === 1 ? (
                     <>
-                      <Globe className="w-3.5 h-3.5" />
+                      <Globe className="w-3 h-3" />
                       <span className="text-xs font-medium">Public</span>
                     </>
                   ) : (
                     <>
-                      <Lock className="w-3.5 h-3.5" />
+                      <Lock className="w-3 h-3" />
                       <span className="text-xs font-medium">Only me</span>
                     </>
                   )}
                 </div>
-                <ChevronDown className="w-3.5 h-3.5" />
+                <ChevronDown className="w-3 h-3" />
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 pt-3 sm:pt-4">
+          <div className="grid grid-cols-2 gap-2 pt-2">
             <button
               type="button"
               onClick={() => {
@@ -569,13 +569,13 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 }
                 onClose();
               }}
-              className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 text-xs sm:text-sm md:text-base font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              className="px-3 py-2 text-xs sm:text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 text-xs sm:text-sm md:text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm"
+              className="px-3 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
             >
               {property ? 'Update Property' : 'Add Property'}
             </button>
