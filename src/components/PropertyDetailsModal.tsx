@@ -162,11 +162,25 @@ export function PropertyDetailsModal({
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
                 <MapPin className="w-3.5 h-3.5 text-gray-500" />
-                <span className="text-xs sm:text-sm text-gray-600">Location</span>
+                <span className="text-xs sm:text-sm text-gray-600" >Area</span>
               </div>
               <div className="text-right">
                 <span className="text-xs sm:text-sm font-semibold text-gray-900">
                   {property.area}, {property.city}
+                </span>
+                {property.location && (
+                  <p className="text-xs text-gray-500 mt-0.5">({property.location})</p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-3.5 h-3.5 text-gray-500" />
+                <span className="text-xs sm:text-sm text-gray-600" >Location</span>
+              </div>
+              <div className="text-right">
+                <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                  {property.location}, {property.city}
                 </span>
                 {property.location && (
                   <p className="text-xs text-gray-500 mt-0.5">({property.location})</p>
