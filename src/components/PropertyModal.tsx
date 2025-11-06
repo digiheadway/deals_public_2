@@ -18,6 +18,8 @@ interface PropertyModalProps {
 const STORAGE_KEY = 'propnetwork_property_form_draft';
 
 export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProps) {
+  const [showNoteTooltip, setShowNoteTooltip] = useState(false);
+  
   // Load draft from localStorage if no property (new property) - memoize to prevent re-renders
   const draftData = useMemo(() => {
     if (property) return null; // Don't load draft when editing
@@ -508,7 +510,21 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
               <FileText className="w-3 h-3 text-gray-500" />
-              Private notes <span className="text-xs text-gray-500 normal-case">(Only for you)</span>
+              Private notes{' '}
+              <span 
+                className="relative inline-flex items-center border-b border-dotted border-gray-400 cursor-help pb-0.5" 
+                style={{ borderBottomWidth: '1px' }}
+                onMouseEnter={() => setShowNoteTooltip(true)}
+                onMouseLeave={() => setShowNoteTooltip(false)}
+              >
+                <Lock className="w-3 h-3 text-gray-400" />
+                {showNoteTooltip && (
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 bg-gray-900 text-white text-xs rounded z-50 pointer-events-none max-w-[200px] sm:max-w-none text-center">
+                    This note is visible only to you even if you share the property to public
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                )}
+              </span>
             </label>
             <textarea
               name="note_private"
