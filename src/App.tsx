@@ -291,6 +291,16 @@ function App() {
     }
   };
 
+  const handleUpdateLocation = async (id: number, location: string, locationAccuracy: string) => {
+    try {
+      await propertyApi.updateProperty(id, ownerId, { location, location_accuracy: locationAccuracy });
+      showToast('Location updated successfully', 'success');
+      await refreshPropertiesAndFilters(true);
+    } catch (error) {
+      showToast('Failed to update location', 'error');
+    }
+  };
+
   const handleShare = async (property: Property) => {
     const sizeText = property.min_size === property.size_max
       ? `${property.min_size} ${property.size_unit}`
@@ -677,6 +687,7 @@ function App() {
           onShare={handleShare}
           onAskQuestion={handleAskQuestion}
           onUpdateHighlightsAndTags={handleUpdateHighlightsAndTags}
+          onUpdateLocation={handleUpdateLocation}
         />
       )}
 

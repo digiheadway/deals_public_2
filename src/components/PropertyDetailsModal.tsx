@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Copy, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapPin, FileText, Sparkles, Tag, Lock, Globe, ChevronDown, Star, Building, CornerDownRight, Navigation, Shield, Wifi, CheckCircle } from 'lucide-react';
+import { X, Copy, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapPin, FileText, Sparkles, Tag, Lock, Globe, ChevronDown, Star, Building, CornerDownRight, Navigation, Shield, Wifi, CheckCircle, Calendar } from 'lucide-react';
 import { Property } from '../types/property';
 import { formatPrice, formatPriceWithLabel } from '../utils/priceFormatter';
 
@@ -13,6 +13,7 @@ interface PropertyDetailsModalProps {
   onShare?: (property: Property) => void;
   onAskQuestion?: (property: Property) => void;
   onUpdateHighlightsAndTags?: (id: number, highlights: string, tags: string) => void;
+  onUpdateLocation?: (id: number, location: string, locationAccuracy: string) => void;
 }
 
 const HIGHLIGHT_OPTIONS = [
@@ -37,6 +38,14 @@ const TAG_OPTIONS = [
   'Airport Nearby',
 ];
 
+// Helper function to check if location has lat/long format
+function hasLocationCoordinates(location: string | undefined): boolean {
+  if (!location) return false;
+  // Check if location is in "lat,long" format (e.g., "28.7041,77.1025")
+  const latLongPattern = /^-?\d+\.?\d*,-?\d+\.?\d*$/;
+  return latLongPattern.test(location.trim());
+}
+
 export function PropertyDetailsModal({
   property,
   isOwned,
@@ -47,16 +56,31 @@ export function PropertyDetailsModal({
   onShare,
   onAskQuestion,
   onUpdateHighlightsAndTags,
+  onUpdateLocation,
 }: PropertyDetailsModalProps) {
   const [copied, setCopied] = useState(false);
   const [showHighlightModal, setShowHighlightModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const [selectedHighlights, setSelectedHighlights] = useState<string[]>(
     property.highlights ? property.highlights.split(',').map(h => h.trim()).filter(Boolean) : []
   );
   const [selectedTags, setSelectedTags] = useState<string[]>(
     property.tags ? property.tags.split(',').map(t => t.trim()).filter(Boolean) : []
   );
+
+  // Parse location coordinates
+  const parseLocation = (location: string | undefined): { lat: number; lng: number } | null => {
+    if (!hasLocationCoordinates(location || '')) return null;
+    const parts = (location || '').split(',');
+    const lat = parseFloat(parts[0].trim());
+    const lng = parseFloat(parts[1].trim());
+    if (isNaN(lat) || isNaN(lng)) return null;
+    return { lat, lng };
+  };
+
+  const locationCoords = parseLocation(property.location);
+  const hasLocation = hasLocationCoordinates(property.location);
 
   // Update local state when property changes
   useEffect(() => {
@@ -168,9 +192,6 @@ export function PropertyDetailsModal({
                 <span className="text-xs sm:text-sm font-semibold text-gray-900">
                   {property.area}, {property.city}
                 </span>
-                {property.location && (
-                  <p className="text-xs text-gray-500 mt-0.5">({property.location})</p>
-                )}
               </div>
             </div>
             <div className="flex items-start justify-between">
@@ -178,13 +199,54 @@ export function PropertyDetailsModal({
                 <MapPin className="w-3.5 h-3.5 text-gray-500" />
                 <span className="text-xs sm:text-sm text-gray-600" >Location</span>
               </div>
+              <div className="text-right flex items-center gap-2">
+                {hasLocation ? (
+                  <>
+                    <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                      {locationCoords ? `${locationCoords.lat.toFixed(6)}, ${locationCoords.lng.toFixed(6)}` : property.location}
+                      {property.location_accuracy && (
+                        <span className="text-xs text-gray-500 ml-1">({property.location_accuracy}m radius)</span>
+                      )}
+                    </span>
+                    {isOwned && (
+                      <button
+                        onClick={() => setShowLocationModal(true)}
+                        className="text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        Edit
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs sm:text-sm text-gray-500">No location set</span>
+                    {isOwned && (
+                      <button
+                        onClick={() => setShowLocationModal(true)}
+                        className="text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add Location
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-gray-500" />
+                <span className="text-xs sm:text-sm text-gray-600" >Created on</span>
+              </div>
               <div className="text-right">
                 <span className="text-xs sm:text-sm font-semibold text-gray-900">
-                  {property.location}, {property.city}
+                  {new Date(property.created_on).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
                 </span>
-                {property.location && (
-                  <p className="text-xs text-gray-500 mt-0.5">({property.location})</p>
-                )}
               </div>
             </div>
           </div>
@@ -582,6 +644,215 @@ export function PropertyDetailsModal({
           </div>
         </div>
       )}
+
+      {showLocationModal && (
+        <LocationModal
+          property={property}
+          onClose={() => setShowLocationModal(false)}
+          onSave={(location, locationAccuracy) => {
+            if (onUpdateLocation) {
+              onUpdateLocation(property.id, location, locationAccuracy);
+            }
+            setShowLocationModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Location Modal Component
+interface LocationModalProps {
+  property: Property;
+  onClose: () => void;
+  onSave: (location: string, locationAccuracy: string) => void;
+}
+
+function LocationModal({ property, onClose, onSave }: LocationModalProps) {
+  const [latLongInput, setLatLongInput] = useState(() => {
+    // Check if property has location coordinates
+    const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((property.location || '').trim());
+    return hasCoords ? property.location : '';
+  });
+  const [radius, setRadius] = useState(() => {
+    return property.location_accuracy ? parseFloat(property.location_accuracy) || 500 : 500;
+  });
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+
+  // Update state when property changes
+  useEffect(() => {
+    const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((property.location || '').trim());
+    setLatLongInput(hasCoords ? property.location : '');
+    setRadius(property.location_accuracy ? parseFloat(property.location_accuracy) || 500 : 500);
+  }, [property.location, property.location_accuracy]);
+
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setIsGettingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setLatLongInput(`${lat.toFixed(6)},${lng.toFixed(6)}`);
+        setIsGettingLocation(false);
+      },
+      (error) => {
+        setIsGettingLocation(false);
+        let errorMessage = 'Failed to get your location. ';
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Please allow location access in your browser settings.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information is unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out.';
+            break;
+          default:
+            errorMessage += 'An unknown error occurred.';
+            break;
+        }
+        alert(errorMessage);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  const handleSave = () => {
+    const trimmed = latLongInput.trim();
+    if (!trimmed) {
+      alert('Please enter latitude and longitude');
+      return;
+    }
+
+    // Validate lat/long format
+    const latLongPattern = /^-?\d+\.?\d*,-?\d+\.?\d*$/;
+    if (!latLongPattern.test(trimmed)) {
+      alert('Please enter valid latitude and longitude in format: lat,long (e.g., 28.7041,77.1025)');
+      return;
+    }
+
+    // Validate lat/long values
+    const parts = trimmed.split(',');
+    const lat = parseFloat(parts[0].trim());
+    const lng = parseFloat(parts[1].trim());
+
+    if (isNaN(lat) || isNaN(lng)) {
+      alert('Please enter valid numeric values for latitude and longitude');
+      return;
+    }
+
+    if (lat < -90 || lat > 90) {
+      alert('Latitude must be between -90 and 90');
+      return;
+    }
+
+    if (lng < -180 || lng > 180) {
+      alert('Longitude must be between -180 and 180');
+      return;
+    }
+
+    onSave(trimmed, radius.toString());
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData('text');
+    setLatLongInput(pastedText.trim());
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[98vh] sm:max-h-[80vh] overflow-y-auto animate-slide-up">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-2xl">
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900">
+            {hasLocationCoordinates(property.location) ? 'Edit Location' : 'Add Location'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-6 space-y-6">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Latitude, Longitude
+              </label>
+              <button
+                type="button"
+                onClick={handleGetCurrentLocation}
+                disabled={isGettingLocation}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Navigation className={`w-3.5 h-3.5 ${isGettingLocation ? 'animate-spin' : ''}`} />
+                {isGettingLocation ? 'Getting Location...' : 'Use GPS'}
+              </button>
+            </div>
+            <input
+              type="text"
+              value={latLongInput}
+              onChange={(e) => setLatLongInput(e.target.value)}
+              onPaste={handlePaste}
+              placeholder="Paste lat,long here (e.g., 28.7041,77.1025)"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+            />
+            <p className="text-xs text-gray-500 mt-1.5">
+              Format: latitude,longitude (e.g., 28.7041,77.1025) or click "Use GPS" to get your current location
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Radius: {radius}m
+            </label>
+            <input
+              type="range"
+              min="100"
+              max="5000"
+              step="100"
+              value={radius}
+              onChange={(e) => setRadius(parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>100m</span>
+              <span>2500m</span>
+              <span>5000m</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 pt-4">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
