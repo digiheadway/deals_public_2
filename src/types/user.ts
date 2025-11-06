@@ -1,0 +1,151 @@
+export interface User {
+  id: number;
+  name: string;
+  phone: string;
+  address: string;
+  firmName: string;
+  pin: string;
+  city?: string;
+  area?: string;
+  propertyType?: string;
+  createdAt: number;
+}
+
+const STORAGE_KEY = 'propnetwork_users';
+const CURRENT_USER_KEY = 'propnetwork_current_user';
+const NEXT_ID_KEY = 'propnetwork_next_user_id';
+
+// Get all users from localStorage
+export function getAllUsers(): User[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Failed to load users:', error);
+  }
+  return [];
+}
+
+// Save all users to localStorage
+function saveAllUsers(users: User[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
+  } catch (error) {
+    console.error('Failed to save users:', error);
+  }
+}
+
+// Get current logged-in user
+export function getCurrentUser(): User | null {
+  try {
+    const stored = localStorage.getItem(CURRENT_USER_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Failed to load current user:', error);
+  }
+  return null;
+}
+
+// Set current logged-in user
+export function setCurrentUser(user: User | null): void {
+  try {
+    if (user) {
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(CURRENT_USER_KEY);
+    }
+  } catch (error) {
+    console.error('Failed to save current user:', error);
+  }
+}
+
+// Get next user ID
+function getNextUserId(): number {
+  try {
+    const stored = localStorage.getItem(NEXT_ID_KEY);
+    if (stored) {
+      return parseInt(stored, 10);
+    }
+  } catch (error) {
+    console.error('Failed to load next user ID:', error);
+  }
+  return 1;
+}
+
+// Save next user ID
+function saveNextUserId(id: number): void {
+  try {
+    localStorage.setItem(NEXT_ID_KEY, id.toString());
+  } catch (error) {
+    console.error('Failed to save next user ID:', error);
+  }
+}
+
+// Register a new user
+export function registerUser(userData: Omit<User, 'id' | 'createdAt'>): User {
+  const users = getAllUsers();
+  const nextId = getNextUserId();
+  
+  // Check if phone already exists
+  const existingUser = users.find(u => u.phone === userData.phone);
+  if (existingUser) {
+    throw new Error('Phone number already registered');
+  }
+  
+  const newUser: User = {
+    ...userData,
+    id: nextId,
+    createdAt: Date.now(),
+  };
+  
+  users.push(newUser);
+  saveAllUsers(users);
+  saveNextUserId(nextId + 1);
+  
+  return newUser;
+}
+
+// Initialize test user if no users exist
+export function initializeTestUser(): void {
+  const users = getAllUsers();
+  if (users.length === 0) {
+    const testUser: User = {
+      id: 1,
+      name: 'Test User',
+      phone: '1234567890',
+      address: '123 Test Street',
+      firmName: 'Test Firm',
+      pin: '1234',
+      createdAt: Date.now(),
+    };
+    users.push(testUser);
+    saveAllUsers(users);
+    saveNextUserId(2);
+  }
+}
+
+// Login with phone and PIN
+export function loginUser(phone: string, pin: string): User | null {
+  // Initialize test user if no users exist
+  initializeTestUser();
+  
+  const users = getAllUsers();
+  const user = users.find(u => u.phone === phone && u.pin === pin);
+  
+  if (user) {
+    setCurrentUser(user);
+    return user;
+  }
+  
+  return null;
+}
+
+// Logout
+export function logoutUser(): void {
+  setCurrentUser(null);
+}
+

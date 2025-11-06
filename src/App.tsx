@@ -6,10 +6,13 @@ import { PropertyDetailsModal } from './components/PropertyDetailsModal';
 import { ContactModal } from './components/ContactModal';
 import { SearchFilter } from './components/SearchFilter';
 import { ProfilePage } from './components/ProfilePage';
+import { HomePage } from './components/HomePage';
+import { AuthPage } from './components/AuthPage';
 import { Toast } from './components/Toast';
 import { useAuth } from './contexts/AuthContext';
 import { propertyApi } from './services/api';
 import { Property, PropertyFormData, FilterOptions } from './types/property';
+import { logoutUser, getCurrentUser } from './types/user';
 
 type FilterType = 'all' | 'my' | 'public';
 
@@ -23,7 +26,17 @@ const STORAGE_KEYS = {
 };
 
 function App() {
-  const { ownerId, setOwnerId } = useAuth();
+  const { ownerId, setOwnerId, isAuthenticated, setUser } = useAuth();
+  const [showLandingPage, setShowLandingPage] = useState<boolean>(() => {
+    try {
+      const hasVisited = localStorage.getItem('has_visited_app');
+      // Show landing page if user hasn't visited, or if explicitly set to show
+      return hasVisited !== 'true';
+    } catch {
+      // If localStorage fails, default to showing landing page
+      return true;
+    }
+  });
   const [currentPage, setCurrentPage] = useState<'home' | 'profile'>('home');
   
   // Load persisted activeFilter from localStorage
@@ -314,6 +327,79 @@ function App() {
     return 'Public Properties';
   };
 
+  const handleLogin = (userId: number) => {
+    // Refresh user from localStorage (set by loginUser function)
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      setUser(currentUser);
+    }
+    setOwnerId(userId);
+    // After login, check if user has visited before
+    try {
+      const hasVisited = localStorage.getItem('has_visited_app');
+      if (hasVisited !== 'true') {
+        setShowLandingPage(true);
+      } else {
+        setShowLandingPage(false);
+      }
+    } catch {
+      setShowLandingPage(true);
+    }
+  };
+
+  const handleGetStarted = () => {
+    try {
+      localStorage.setItem('has_visited_app', 'true');
+    } catch (error) {
+      console.error('Failed to save to localStorage:', error);
+    }
+    setShowLandingPage(false);
+  };
+
+  const handleLogout = () => {
+    logoutUser();
+    setUser(null);
+    setShowLandingPage(true);
+    try {
+      localStorage.removeItem('has_visited_app');
+    } catch (error) {
+      console.error('Failed to clear localStorage:', error);
+    }
+  };
+
+  // Always show landing page if flag is set (regardless of authentication)
+  if (showLandingPage) {
+    return (
+      <HomePage 
+        onGetStarted={handleGetStarted}
+        isAuthenticated={isAuthenticated}
+        onGoToLogin={() => {
+          // Clear auth and show login page
+          logoutUser();
+          setUser(null);
+          setShowLandingPage(false);
+        }}
+        onGoToApp={handleGetStarted}
+      />
+    );
+  }
+
+  // Show auth page if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <AuthPage 
+        onLogin={handleLogin}
+        onGoToHome={() => {
+          // Show landing page
+          try {
+            localStorage.removeItem('has_visited_app');
+          } catch {}
+          setShowLandingPage(true);
+        }}
+      />
+    );
+  }
+
   if (currentPage === 'profile') {
     return <ProfilePage onBack={() => setCurrentPage('home')} />;
   }
@@ -515,7 +601,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => {
-                    setOwnerId(1);
+                    handleLogout();
                     setShowUserMenu(false);
                     showToast('Logged out', 'success');
                   }}

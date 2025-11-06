@@ -1,0 +1,464 @@
+import { useState } from 'react';
+import { User, Phone, Lock, Building, MapPin, ChevronDown, Eye, EyeOff } from 'lucide-react';
+
+interface AuthPageProps {
+  onLogin: (userId: number) => void;
+  onGoToHome?: () => void;
+}
+
+const CITY_OPTIONS = ['Panipat', 'Delhi', 'Gurgaon', 'Noida', 'Faridabad'];
+const AREA_OPTIONS = [
+  'Sector 1', 'Sector 2', 'Sector 3', 'Sector 4', 'Sector 5',
+  'Sector 6', 'Sector 7', 'Sector 8', 'Sector 9', 'Sector 10',
+  'Sector 12', 'Sector 13', 'Sector 14', 'Sector 15', 'Sector 16',
+  'Sector 17', 'Sector 18', 'Sector 19', 'Sector 20', 'Sector 21',
+  'Sector 22', 'Sector 23', 'Sector 24', 'Sector 25', 'Model Town',
+  'Civil Lines', 'GT Road', 'Huda Sector', 'Industrial Area'
+];
+const PROPERTY_TYPES = [
+  'Residential Plot',
+  'Commercial Plot',
+  'House',
+  'Apartment',
+  'Agriculture Land',
+  'Industrial Plot'
+];
+
+export function AuthPage({ onLogin, onGoToHome }: AuthPageProps) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [showPin, setShowPin] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Login form state
+  const [loginPhone, setLoginPhone] = useState('1234567890');
+  const [loginPin, setLoginPin] = useState('1234');
+
+  // Signup form state
+  const [signupName, setSignupName] = useState('');
+  const [signupPhone, setSignupPhone] = useState('');
+  const [signupAddress, setSignupAddress] = useState('');
+  const [signupFirmName, setSignupFirmName] = useState('');
+  const [signupPin, setSignupPin] = useState('');
+  const [signupCity, setSignupCity] = useState('');
+  const [signupArea, setSignupArea] = useState<string[]>([]);
+  const [signupPropertyType, setSignupPropertyType] = useState<string[]>([]);
+  const [showAdditionalDetails, setShowAdditionalDetails] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const { loginUser } = await import('../types/user');
+      const user = loginUser(loginPhone.trim(), loginPin);
+      
+      if (user) {
+        onLogin(user.id);
+      } else {
+        setError('Invalid phone number or PIN');
+      }
+    } catch (err) {
+      setError('Login failed. Please try again.');
+      console.error('Login error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    // Validate required fields
+    if (!signupName.trim() || !signupPhone.trim() || !signupAddress.trim() || !signupFirmName.trim() || !signupPin.trim()) {
+      setError('Please fill in all required fields');
+      setLoading(false);
+      return;
+    }
+
+    // Validate PIN (should be at least 4 digits)
+    if (signupPin.length < 4) {
+      setError('PIN must be at least 4 digits');
+      setLoading(false);
+      return;
+    }
+
+    // Validate phone (should be 10 digits)
+    if (!/^\d{10}$/.test(signupPhone.trim())) {
+      setError('Phone number must be 10 digits');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { registerUser, setCurrentUser } = await import('../types/user');
+      const newUser = registerUser({
+        name: signupName.trim(),
+        phone: signupPhone.trim(),
+        address: signupAddress.trim(),
+        firmName: signupFirmName.trim(),
+        pin: signupPin,
+        city: signupCity || undefined,
+        area: signupArea.length > 0 ? signupArea.join(', ') : undefined,
+        propertyType: signupPropertyType.length > 0 ? signupPropertyType.join(', ') : undefined,
+      });
+      
+      setCurrentUser(newUser);
+      onLogin(newUser.id);
+    } catch (err: any) {
+      setError(err.message || 'Signup failed. Please try again.');
+      console.error('Signup error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex flex-col">
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
+        <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <button
+              onClick={onGoToHome}
+              className="cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+                Dealer Network
+              </h1>
+            </button>
+            <p className="text-gray-600">
+              Welcome back!
+            </p>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Login Form */}
+          {isLogin ? (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={loginPhone}
+                    onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="Enter 10-digit phone number"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    PIN
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Forgot password functionality - can be implemented later
+                      setError('Please contact support to reset your PIN');
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Forgot Pin?
+                  </button>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPin ? 'text' : 'password'}
+                    value={loginPin}
+                    onChange={(e) => setLoginPin(e.target.value)}
+                    placeholder="Enter your PIN"
+                    className="w-full pl-10 pr-12 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPin ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Logging in...' : 'Login'}
+              </button>
+
+              <div className="text-center pt-2">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsLogin(false);
+                      setError('');
+                      setShowAdditionalDetails(true);
+                    }}
+                    className="text-blue-600 hover:text-blue-700 font-semibold"
+                  >
+                    Sign Up
+                  </button>
+                </p>
+              </div>
+            </form>
+          ) : (
+            /* Signup Form */
+            <form onSubmit={handleSignup} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={signupName}
+                    onChange={(e) => setSignupName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={signupPhone}
+                    onChange={(e) => setSignupPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="Enter 10-digit phone number"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Office Address <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={signupAddress}
+                    onChange={(e) => setSignupAddress(e.target.value)}
+                    placeholder="Enter your office address"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Firm Name <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={signupFirmName}
+                    onChange={(e) => setSignupFirmName(e.target.value)}
+                    placeholder="Enter your firm name"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  PIN <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPin ? 'text' : 'password'}
+                    value={signupPin}
+                    onChange={(e) => setSignupPin(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Create a 4+ digit PIN"
+                    className="w-full pl-10 pr-12 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    minLength={4}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPin ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">Minimum 4 digits</p>
+              </div>
+
+              {/* Additional Details Toggle */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdditionalDetails(!showAdditionalDetails)}
+                  className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-sm font-medium text-gray-700">Additional Details (Optional)</span>
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-400 transition-transform ${
+                      showAdditionalDetails ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Additional Details Fields */}
+              {showAdditionalDetails && (
+                <div className="space-y-4 pt-2 border-t border-gray-200">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    City
+                  </label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <select
+                      value={signupCity}
+                      onChange={(e) => setSignupCity(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
+                    >
+                      <option value="">Select City</option>
+                      {CITY_OPTIONS.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Area
+                  </label>
+                  <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto bg-white">
+                    <div className="space-y-2">
+                      {AREA_OPTIONS.map((area) => (
+                        <label key={area} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={signupArea.includes(area)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSignupArea([...signupArea, area]);
+                              } else {
+                                setSignupArea(signupArea.filter(a => a !== area));
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">{area}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {signupArea.length > 0 && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Selected: {signupArea.join(', ')}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Property Type
+                  </label>
+                  <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto bg-white">
+                    <div className="space-y-2">
+                      {PROPERTY_TYPES.map((type) => (
+                        <label key={type} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={signupPropertyType.includes(type)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSignupPropertyType([...signupPropertyType, type]);
+                              } else {
+                                setSignupPropertyType(signupPropertyType.filter(t => t !== type));
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">{type}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {signupPropertyType.length > 0 && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Selected: {signupPropertyType.join(', ')}
+                    </p>
+                  )}
+                </div>
+              </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Creating Account...' : 'Sign Up'}
+              </button>
+
+              <div className="text-center pt-2">
+                <p className="text-sm text-gray-600">
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsLogin(true);
+                      setError('');
+                    }}
+                    className="text-blue-600 hover:text-blue-700 font-semibold"
+                  >
+                    Login
+                  </button>
+                </p>
+              </div>
+            </form>
+          )}
+        </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
