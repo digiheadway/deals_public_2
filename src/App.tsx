@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Home, Globe, User, LogOut, ChevronDown, Settings } from 'lucide-react';
 import { PropertyCard } from './components/PropertyCard';
+import { PropertyCardSkeleton } from './components/PropertyCardSkeleton';
 import { PropertyModal } from './components/PropertyModal';
 import { PropertyDetailsModal } from './components/PropertyDetailsModal';
 import { ContactModal } from './components/ContactModal';
@@ -486,8 +487,10 @@ function App() {
 
         <div className="mt-4 sm:mt-6">
           {loading ? (
-            <div className="flex items-center justify-center h-48 sm:h-64">
-              <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-blue-600"></div>
+            <div className="space-y-3 sm:space-y-4">
+              {[...Array(3)].map((_, index) => (
+                <PropertyCardSkeleton key={index} />
+              ))}
             </div>
           ) : currentProperties.length === 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 p-8 sm:p-12 text-center">

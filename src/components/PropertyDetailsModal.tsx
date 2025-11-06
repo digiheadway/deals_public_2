@@ -167,6 +167,15 @@ export function PropertyDetailsModal({
             </div>
           </div>
 
+          {property.description && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                Description
+              </h3>
+              <p className="text-gray-700 leading-relaxed">{property.description}</p>
+            </div>
+          )}
+
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
@@ -204,15 +213,6 @@ export function PropertyDetailsModal({
               )
             )}
           </div>
-
-          {property.description && (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
-                Description
-              </h3>
-              <p className="text-gray-700 leading-relaxed">{property.description}</p>
-            </div>
-          )}
 
           {isOwned && property.note_private && (
 
