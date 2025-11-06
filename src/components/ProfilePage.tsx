@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Save, User as UserIcon, MapPin, Home, DollarSign, Ruler } from 'lucide-react';
+import { ArrowLeft, Save, User as UserIcon, MapPin, Home, DollarSign, Ruler, LogOut, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { UserSettings, getUserSettings, saveUserSettings, DEFAULT_USER_SETTINGS } from '../types/userSettings';
 import { CITY_OPTIONS, AREA_OPTIONS, PROPERTY_TYPES, SIZE_UNITS } from '../utils/filterOptions';
 
 interface ProfilePageProps {
   onBack: () => void;
+  onLogout: () => void;
+  onSwitchUser: () => void;
 }
 
-export function ProfilePage({ onBack }: ProfilePageProps) {
+export function ProfilePage({ onBack, onLogout, onSwitchUser }: ProfilePageProps) {
   const { ownerId } = useAuth();
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const [showAreaDropdown, setShowAreaDropdown] = useState(false);
@@ -360,6 +362,27 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                   Settings saved successfully!
                 </p>
               )}
+            </div>
+          </div>
+
+          {/* Account Actions Section */}
+          <div className="p-6 border-t border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Account Actions</h3>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={onSwitchUser}
+                className="flex-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-gray-700"
+              >
+                <Users className="w-4 h-4" />
+                Switch User ID
+              </button>
+              <button
+                onClick={onLogout}
+                className="flex-1 px-3 py-2 text-sm bg-white border border-red-300 rounded-lg font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2 text-red-700"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
             </div>
           </div>
         </div>

@@ -186,17 +186,31 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
     <div className="space-y-2 sm:space-y-3">
       <div className="flex gap-1.5 sm:gap-2">
         <div className="relative flex-1 flex">
-          <div className="relative" ref={columnDropdownRef}>
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+              <input
+              type="text"
+              placeholder={`Search in ${selectedColumnLabel.toLowerCase()}...`}
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                // Auto-save to localStorage
+                localStorage.setItem(STORAGE_KEYS.SEARCH_QUERY, e.target.value);
+              }}
+              className="w-full h-9 sm:h-10 pl-8 sm:pl-10 pr-3 sm:pr-4 border border-r-0 border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            />
+          </div>
+          <div className="relative flex-shrink-0" ref={columnDropdownRef}>
             <button
               type="button"
               onClick={() => setShowColumnDropdown(!showColumnDropdown)}
-              className="h-9 sm:h-10 px-2 sm:px-3 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 hover:bg-gray-100 transition-colors flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap"
+              className="h-9 sm:h-10 px-2 sm:px-3 border border-l-0 border-gray-300 rounded-r-lg bg-gray-50 hover:bg-gray-100 transition-colors flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap"
             >
               <span className="truncate max-w-[100px] sm:max-w-[120px] md:max-w-none">{selectedColumnLabel}</span>
               <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform flex-shrink-0 ${showColumnDropdown ? 'rotate-180' : ''}`} />
             </button>
             {showColumnDropdown && (
-              <div className="absolute left-0 top-full mt-1 w-44 sm:w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 max-h-64 overflow-y-auto">
+              <div className="absolute right-0 top-full mt-1 w-44 sm:w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 max-h-64 overflow-y-auto">
                 {SEARCH_COLUMNS.map((column) => (
                   <button
                     key={column.value}
@@ -217,20 +231,6 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                 ))}
               </div>
             )}
-          </div>
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
-              <input
-              type="text"
-              placeholder={`Search in ${selectedColumnLabel.toLowerCase()}...`}
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                // Auto-save to localStorage
-                localStorage.setItem(STORAGE_KEYS.SEARCH_QUERY, e.target.value);
-              }}
-              className="w-full h-9 sm:h-10 pl-8 sm:pl-10 pr-3 sm:pr-4 border border-l-0 border-gray-300 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-            />
           </div>
         </div>
         <button

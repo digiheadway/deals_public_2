@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Home, Globe, User, LogOut, ChevronDown, Settings } from 'lucide-react';
+import { Plus, Home, Globe, ChevronDown, Settings } from 'lucide-react';
 import { PropertyCard } from './components/PropertyCard';
 import { PropertyCardSkeleton } from './components/PropertyCardSkeleton';
 import { PropertyModal } from './components/PropertyModal';
@@ -56,7 +56,6 @@ function App() {
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -69,38 +68,45 @@ function App() {
   const filterMenuRef = useRef<HTMLDivElement>(null);
 
   const loadMyProperties = useCallback(async () => {
+    if (!ownerId || ownerId <= 0) return;
     try {
       const data = await propertyApi.getUserProperties(ownerId);
       setMyProperties(data);
     } catch (error) {
-      showToast('Failed to load properties', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load properties';
+      showToast(errorMessage, 'error');
     }
   }, [ownerId]);
 
   const loadPublicProperties = useCallback(async () => {
+    if (!ownerId || ownerId <= 0) return;
     try {
       const data = await propertyApi.getPublicProperties(ownerId);
       setPublicProperties(data);
     } catch (error) {
-      showToast('Failed to load public properties', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load public properties';
+      showToast(errorMessage, 'error');
     }
   }, [ownerId]);
 
   const loadAllProperties = useCallback(async () => {
+    if (!ownerId || ownerId <= 0) return;
     try {
       const data = await propertyApi.getAllProperties(ownerId);
       setAllProperties(data);
     } catch (error) {
-      showToast('Failed to load all properties', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load all properties';
+      showToast(errorMessage, 'error');
     }
   }, [ownerId]);
 
   useEffect(() => {
+    if (!ownerId || ownerId <= 0) return;
     setLoading(true);
     Promise.all([loadMyProperties(), loadPublicProperties(), loadAllProperties()]).then(() => {
       setLoading(false);
     });
-  }, [loadMyProperties, loadPublicProperties, loadAllProperties]);
+  }, [loadMyProperties, loadPublicProperties, loadAllProperties, ownerId]);
 
   useEffect(() => {
     // Only set default properties if there's no active search or filters
@@ -431,7 +437,7 @@ function App() {
     setShowContactModal(true);
   };
 
-  const handleContactSubmit = (message: string, phone: string) => {
+  const handleContactSubmit = (_message: string, _phone: string) => {
     showToast('Question sent via WhatsApp!', 'success');
   };
 
@@ -517,7 +523,18 @@ function App() {
   }
 
   if (currentPage === 'profile') {
-    return <ProfilePage onBack={() => setCurrentPage('home')} />;
+    return (
+      <ProfilePage 
+        onBack={() => setCurrentPage('home')}
+        onLogout={() => {
+          handleLogout();
+          showToast('Logged out', 'success');
+        }}
+        onSwitchUser={() => {
+          handleUserIdChange();
+        }}
+      />
+    );
   }
 
   return (
@@ -689,50 +706,6 @@ function App() {
         <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
       </button>
 
-      <footer className="bg-white border-t border-gray-200 py-3 sm:py-4 px-3 sm:px-4 mt-8 sm:mt-12">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
-            <span className="text-xs sm:text-sm text-gray-700">
-              Logged in as <span className="font-semibold text-blue-600">User {ownerId}</span>
-            </span>
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-xs sm:text-sm font-medium"
-              title="User menu"
-            >
-              Switch User
-            </button>
-
-            {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                <button
-                  onClick={() => {
-                    handleUserIdChange();
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  Switch User ID
-                </button>
-                <button
-                  onClick={() => {
-                    handleLogout();
-                    setShowUserMenu(false);
-                    showToast('Logged out', 'success');
-                  }}
-                  className="w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                >
-                  <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
