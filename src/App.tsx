@@ -168,6 +168,21 @@ function App() {
     }
   };
 
+  const handleUpdateHighlightsAndTags = async (id: number, highlights: string, tags: string) => {
+    try {
+      await propertyApi.updateProperty(id, ownerId, { highlights, tags });
+      showToast('Highlights and tags updated successfully', 'success');
+      loadMyProperties();
+      loadAllProperties();
+      loadPublicProperties();
+      if (selectedProperty?.id === id) {
+        setSelectedProperty({ ...selectedProperty, highlights, tags });
+      }
+    } catch (error) {
+      showToast('Failed to update highlights and tags', 'error');
+    }
+  };
+
   const handleShare = async (property: Property) => {
     const sizeText = property.min_size === property.size_max
       ? `${property.min_size} ${property.size_unit}`
@@ -440,6 +455,7 @@ function App() {
           onTogglePublic={handleTogglePublic}
           onShare={handleShare}
           onAskQuestion={handleAskQuestion}
+          onUpdateHighlightsAndTags={handleUpdateHighlightsAndTags}
         />
       )}
 

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, MapPin, Plus } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { X, MapPin, ChevronDown } from 'lucide-react';
 import { Property, PropertyFormData } from '../types/property';
 import { getUserSettings } from '../types/userSettings';
 
@@ -8,28 +8,6 @@ interface PropertyModalProps {
   onClose: () => void;
   onSubmit: (data: PropertyFormData) => void;
 }
-
-const HIGHLIGHT_OPTIONS = [
-  'Excellent location',
-  'Ready to move',
-  'Prime property',
-  'Near amenities',
-  'Corner plot',
-  'Main road facing',
-  'Gated community',
-  'Well connected',
-];
-
-const TAG_OPTIONS = [
-  'Corner',
-  'Main Road',
-  'Near School',
-  'Near Hospital',
-  'Park View',
-  'Market Nearby',
-  'Metro Access',
-  'Airport Nearby',
-];
 
 const STORAGE_KEY = 'propnetwork_property_form_draft';
 
@@ -53,8 +31,8 @@ const AREA_SUGGESTIONS = [
 ];
 
 export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProps) {
-  // Load draft from localStorage if no property (new property)
-  const loadDraft = (): PropertyFormData | null => {
+  // Load draft from localStorage if no property (new property) - memoize to prevent re-renders
+  const draftData = useMemo(() => {
     if (property) return null; // Don't load draft when editing
     try {
       const draft = localStorage.getItem(STORAGE_KEY);
@@ -63,9 +41,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
       }
     } catch {}
     return null;
-  };
-
-  const draftData = loadDraft();
+  }, [property]);
 
   // Get user settings for defaults
   const userSettings = getUserSettings();
@@ -95,11 +71,11 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
       type: userSettings.preferredPropertyTypes.length > 0 ? userSettings.preferredPropertyTypes[0] : '',
       description: '',
       note_private: '',
-      min_size: 0,
-      size_max: 0,
+      min_size: undefined,
+      size_max: undefined,
       size_unit: userSettings.defaultSizeUnit || 'Sqyd',
-      price_min: userSettings.defaultPriceMin || 0,
-      price_max: userSettings.defaultPriceMax || 0,
+      price_min: undefined,
+      price_max: undefined,
       location: '',
       location_accuracy: 'Medium',
       is_public: 0,
@@ -112,35 +88,86 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
 
   const [showSizeRange, setShowSizeRange] = useState(false);
   const [showPriceRange, setShowPriceRange] = useState(false);
-  const [showHighlightModal, setShowHighlightModal] = useState(false);
-  const [showTagModal, setShowTagModal] = useState(false);
-  const [selectedHighlights, setSelectedHighlights] = useState<string[]>(
-    property 
-      ? (property.highlights ? property.highlights.split(',').map(h => h.trim()) : [])
-      : (draftData?.highlights ? draftData.highlights.split(',').map(h => h.trim()).filter(Boolean) : [])
-  );
-  const [selectedTags, setSelectedTags] = useState<string[]>(
-    property
-      ? (property.tags ? property.tags.split(',').map(t => t.trim()) : [])
-      : (draftData?.tags ? draftData.tags.split(',').map(t => t.trim()).filter(Boolean) : [])
-  );
   const [showAreaSuggestions, setShowAreaSuggestions] = useState(false);
+  const [showSizeUnitDropdown, setShowSizeUnitDropdown] = useState(false);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [showPropertyTypeDropdown, setShowPropertyTypeDropdown] = useState(false);
+  
+  const sizeUnitDropdownRef = useRef<HTMLDivElement>(null);
+  const cityDropdownRef = useRef<HTMLDivElement>(null);
+  const propertyTypeDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Memoize button text to prevent unnecessary re-renders
+  const sizeRangeButtonText = useMemo(() => showSizeRange ? 'Hide Range' : 'Show Range', [showSizeRange]);
+  const priceRangeButtonText = useMemo(() => showPriceRange ? 'Hide Range' : 'Show Range', [showPriceRange]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sizeUnitDropdownRef.current && !sizeUnitDropdownRef.current.contains(event.target as Node)) {
+        setShowSizeUnitDropdown(false);
+      }
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(event.target as Node)) {
+        setShowCityDropdown(false);
+      }
+      if (propertyTypeDropdownRef.current && !propertyTypeDropdownRef.current.contains(event.target as Node)) {
+        setShowPropertyTypeDropdown(false);
+      }
+    };
+
+    if (showSizeUnitDropdown || showCityDropdown || showPropertyTypeDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showSizeUnitDropdown, showCityDropdown, showPropertyTypeDropdown]);
+
+  const sizeUnitOptions = [
+    { value: 'Sqyd', label: 'Sq. Yard' },
+    { value: 'Sqft', label: 'Sq. Ft' },
+    { value: 'Acre', label: 'Acre' },
+    { value: 'Marla', label: 'Marla' },
+    { value: 'Kanal', label: 'Kanal' },
+  ];
+
+  const cityOptions = [
+    { value: 'Panipat', label: 'Panipat' },
+    { value: 'Delhi', label: 'Delhi' },
+    { value: 'Gurgaon', label: 'Gurgaon' },
+    { value: 'Noida', label: 'Noida' },
+    { value: 'Faridabad', label: 'Faridabad' },
+  ];
+
+  const propertyTypeOptions = [
+    { value: 'Residential Plot', label: 'Residential Plot' },
+    { value: 'Commercial Plot', label: 'Commercial Plot' },
+    { value: 'House', label: 'House' },
+    { value: 'Apartment', label: 'Apartment' },
+    { value: 'Agriculture Land', label: 'Agriculture Land' },
+    { value: 'Industrial Plot', label: 'Industrial Plot' },
+  ];
+
+  const currentSizeUnitLabel = sizeUnitOptions.find(opt => opt.value === formData.size_unit)?.label || formData.size_unit;
+  const currentCityLabel = cityOptions.find(opt => opt.value === formData.city)?.label || formData.city;
+  const currentPropertyTypeLabel = propertyTypeOptions.find(opt => opt.value === formData.type)?.label || formData.type || 'Select property type';
 
   // Save draft to localStorage as user types (only for new properties, not edits)
+  // Use debounce to prevent excessive re-renders
   useEffect(() => {
     if (!property) {
       // Only save draft for new properties
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          ...formData,
-          highlights: selectedHighlights.join(', '),
-          tags: selectedTags.join(', '),
-          showSizeRange,
-          showPriceRange,
-        }));
-      } catch {}
+      const timeoutId = setTimeout(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            ...formData,
+            showSizeRange,
+            showPriceRange,
+          }));
+        } catch {}
+      }, 300); // Debounce by 300ms
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [formData, selectedHighlights, selectedTags, showSizeRange, showPriceRange, property]);
+  }, [formData, showSizeRange, showPriceRange, property]);
 
   useEffect(() => {
     if (property) {
@@ -163,17 +190,19 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
         public_rating: property.public_rating || 0,
         my_rating: property.my_rating || 0,
       });
-      setSelectedHighlights(property.highlights ? property.highlights.split(',').map(h => h.trim()) : []);
-      setSelectedTags(property.tags ? property.tags.split(',').map(t => t.trim()) : []);
-      setShowSizeRange(property.min_size !== property.size_max);
-      setShowPriceRange(property.price_min !== property.price_max);
+      // Only update range visibility if it actually changed
+      const newShowSizeRange = property.min_size !== property.size_max;
+      const newShowPriceRange = property.price_min !== property.price_max;
+      setShowSizeRange(prev => prev !== newShowSizeRange ? newShowSizeRange : prev);
+      setShowPriceRange(prev => prev !== newShowPriceRange ? newShowPriceRange : prev);
     } else if (draftData) {
       // Restore range visibility from draft (only if explicitly saved)
+      // Only update if different to prevent unnecessary re-renders
       if (typeof draftData.showSizeRange === 'boolean') {
-        setShowSizeRange(draftData.showSizeRange);
+        setShowSizeRange(prev => prev !== draftData.showSizeRange ? draftData.showSizeRange : prev);
       }
       if (typeof draftData.showPriceRange === 'boolean') {
-        setShowPriceRange(draftData.showPriceRange);
+        setShowPriceRange(prev => prev !== draftData.showPriceRange ? draftData.showPriceRange : prev);
       }
     }
   }, [property, draftData]);
@@ -190,8 +219,9 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
       ...formData,
       size_max: showSizeRange ? formData.size_max : formData.min_size,
       price_max: showPriceRange ? formData.price_max : formData.price_min,
-      highlights: selectedHighlights.join(', '),
-      tags: selectedTags.join(', '),
+      // Highlights and tags are managed from view screen, not during add/edit
+      highlights: property?.highlights || '',
+      tags: property?.tags || '',
     };
 
     // Clear draft on successful submit
@@ -210,26 +240,11 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
       ...prev,
       [name]:
         type === 'number'
-          ? parseFloat(value) || 0
+          ? value === '' ? undefined : (isNaN(parseFloat(value)) ? undefined : parseFloat(value))
           : value,
     }));
   };
 
-  const toggleHighlight = (highlight: string) => {
-    setSelectedHighlights(prev =>
-      prev.includes(highlight)
-        ? prev.filter(h => h !== highlight)
-        : [...prev, highlight]
-    );
-  };
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags(prev =>
-      prev.includes(tag)
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
-    );
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-2 sm:p-4">
@@ -253,28 +268,61 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 md:p-8 space-y-3 sm:space-y-4 md:space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-            <div className="relative">
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2 uppercase tracking-wide">
+          <div>
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700">
                 Area/Address
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  name="area"
-                  value={formData.area}
-                  onChange={(e) => {
-                    handleChange(e);
-                    setShowAreaSuggestions(true);
-                  }}
-                  onFocus={() => setShowAreaSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowAreaSuggestions(false), 200)}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 pr-8 sm:pr-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
-                  placeholder="Sector 18"
-                  required
-                />
-                <MapPin className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+              <div className="relative" ref={cityDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowCityDropdown(!showCityDropdown)}
+                  className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm text-gray-700 hover:text-gray-900 inline-flex items-center gap-0.5"
+                >
+                  <span>{currentCityLabel}</span>
+                  <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showCityDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                {showCityDropdown && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 min-w-[120px]">
+                    {cityOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setFormData(prev => ({ ...prev, city: option.value }));
+                          setShowCityDropdown(false);
+                        }}
+                        className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-50 transition-colors ${
+                          formData.city === option.value
+                            ? 'bg-blue-50 text-blue-700 font-medium'
+                            : 'text-gray-700'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                name="area"
+                value={formData.area}
+                onChange={(e) => {
+                  handleChange(e);
+                  setShowAreaSuggestions(true);
+                }}
+                onFocus={() => setShowAreaSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowAreaSuggestions(false), 200)}
+                className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 pr-8 sm:pr-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
+                placeholder="Sector 18"
+                required
+              />
+              <MapPin className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
               {showAreaSuggestions && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                   {AREA_SUGGESTIONS.filter(area =>
@@ -295,81 +343,102 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 </div>
               )}
             </div>
+          </div>
 
-            <div>
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2 uppercase tracking-wide">
-                City
-              </label>
-              <select
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 appearance-none bg-white"
-                required
+          <div>
+            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">
+              Property type
+            </label>
+            <div className="relative" ref={propertyTypeDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setShowPropertyTypeDropdown(!showPropertyTypeDropdown)}
+                className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 bg-white hover:bg-gray-50 transition-colors flex items-center justify-between ${
+                  !formData.type ? 'text-gray-400' : 'text-gray-900'
+                }`}
               >
-                <option value="Panipat">Panipat</option>
-                <option value="Delhi">Delhi</option>
-                <option value="Gurgaon">Gurgaon</option>
-                <option value="Noida">Noida</option>
-                <option value="Faridabad">Faridabad</option>
-              </select>
+                <span>{currentPropertyTypeLabel}</span>
+                <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showPropertyTypeDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {showPropertyTypeDropdown && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
+                  {propertyTypeOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setFormData(prev => ({ ...prev, type: option.value }));
+                        setShowPropertyTypeDropdown(false);
+                      }}
+                      className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-50 transition-colors ${
+                        formData.type === option.value
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           <div>
-            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2 uppercase tracking-wide">
-              Property Type
-            </label>
-            <select
-              name="type"
-              value={formData.type}
-              onChange={handleChange}
-              className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 appearance-none bg-white"
-              required
-            >
-              <option value="">Select property type</option>
-              <option value="Residential Plot">Residential Plot</option>
-              <option value="Commercial Plot">Commercial Plot</option>
-              <option value="House">House</option>
-              <option value="Apartment">Apartment</option>
-              <option value="Agriculture Land">Agriculture Land</option>
-              <option value="Industrial Plot">Industrial Plot</option>
-            </select>
-          </div>
-
-          <div>
             <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                Size
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700">
+                <span>Size (in </span>
+                <span className="relative inline-block" ref={sizeUnitDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowSizeUnitDropdown(!showSizeUnitDropdown)}
+                    className="text-gray-700 hover:text-gray-900 inline-flex items-center gap-0.5"
+                  >
+                    <span>{currentSizeUnitLabel}</span>
+                    <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showSizeUnitDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showSizeUnitDropdown && (
+                    <div className="absolute left-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 min-w-[120px]">
+                      {sizeUnitOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setFormData(prev => ({ ...prev, size_unit: option.value as any }));
+                            setShowSizeUnitDropdown(false);
+                          }}
+                          className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm hover:bg-gray-50 transition-colors ${
+                            formData.size_unit === option.value
+                              ? 'bg-blue-50 text-blue-700 font-medium'
+                              : 'text-gray-700'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </span>
+                <span>)</span>
               </label>
-              <div className="flex items-center gap-2 sm:gap-3">
-                <select
-                  name="size_unit"
-                  value={formData.size_unit}
-                  onChange={handleChange}
-                  className="px-2 sm:px-3 py-1 sm:py-1.5 border border-gray-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="Sqyd">Sq. Yard</option>
-                  <option value="Sqft">Sq. Ft</option>
-                  <option value="Acre">Acre</option>
-                  <option value="Marla">Marla</option>
-                  <option value="Kanal">Kanal</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setShowSizeRange(!showSizeRange)}
-                  className="text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700"
-                >
-                  Show Range
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowSizeRange(!showSizeRange)}
+                className="text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-700"
+              >
+                {sizeRangeButtonText}
+              </button>
             </div>
             {showSizeRange ? (
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <input
                   type="number"
                   name="min_size"
-                  value={formData.min_size || ''}
+                  value={formData.min_size !== undefined && formData.min_size !== null ? formData.min_size : ''}
                   onChange={handleChange}
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
                   placeholder="100"
@@ -379,7 +448,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 <input
                   type="number"
                   name="size_max"
-                  value={formData.size_max || ''}
+                  value={formData.size_max !== undefined && formData.size_max !== null ? formData.size_max : ''}
                   onChange={handleChange}
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
                   placeholder="200"
@@ -392,7 +461,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 <input
                   type="number"
                   name="min_size"
-                  value={formData.min_size || ''}
+                  value={formData.min_size !== undefined && formData.min_size !== null ? formData.min_size : ''}
                   onChange={handleChange}
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
                   placeholder="150"
@@ -405,15 +474,15 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
 
           <div>
             <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                Price (In Lakhs)
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700">
+                Price (in lakhs)
               </label>
               <button
                 type="button"
                 onClick={() => setShowPriceRange(!showPriceRange)}
-                className="text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700"
+                className="text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-700"
               >
-                Show Range
+                {priceRangeButtonText}
               </button>
             </div>
             {showPriceRange ? (
@@ -421,7 +490,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 <input
                   type="number"
                   name="price_min"
-                  value={formData.price_min || ''}
+                  value={formData.price_min !== undefined && formData.price_min !== null ? formData.price_min : ''}
                   onChange={handleChange}
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
                   placeholder="20"
@@ -431,7 +500,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 <input
                   type="number"
                   name="price_max"
-                  value={formData.price_max || ''}
+                  value={formData.price_max !== undefined && formData.price_max !== null ? formData.price_max : ''}
                   onChange={handleChange}
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
                   placeholder="30"
@@ -444,10 +513,10 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 <input
                   type="number"
                   name="price_min"
-                  value={formData.price_min || ''}
+                  value={formData.price_min !== undefined && formData.price_min !== null ? formData.price_min : ''}
                   onChange={handleChange}
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400"
-                  placeholder="25"
+                  placeholder="1 Crore = 100 Lakhs"
                   step="0.01"
                   required
                 />
@@ -457,7 +526,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
           </div>
 
           <div>
-            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2 uppercase tracking-wide">
+            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">
               Description
             </label>
             <textarea
@@ -472,8 +541,8 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
           </div>
 
           <div>
-            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2 uppercase tracking-wide">
-              Private Notes <span className="text-xs text-gray-500 normal-case">(Only for you)</span>
+            <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">
+              Private notes <span className="text-xs text-gray-500 normal-case">(Only for you)</span>
             </label>
             <textarea
               name="note_private"
@@ -486,105 +555,30 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
             <p className="text-xs text-gray-500 mt-1">Add private details like plot number, deal price, owner info, etc</p>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                Highlights
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowHighlightModal(true)}
-                className="flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700"
-              >
-            {selectedHighlights.length > 0 ? (
-  "Manage"
-) : (
-  <>
-    <Plus className="w-4 h-4 inline" /> Add
-  </>
-)}
-
-              </button>
-              
-            </div>
-          {selectedHighlights.length < 1 ? (
-  <p className="text-xs text-gray-500">Add key features of property</p>
-) : null}
-
-            {selectedHighlights.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {selectedHighlights.map((highlight, idx) => (
-                  <span
-                    key={idx}
-                    className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium"
-                  >
-                    {highlight}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                Tags <span className="text-xs text-gray-500 normal-case">(Only for you)</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowTagModal(true)}
-                className="flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700"
-              >
-                {selectedTags.length > 0 ? (
-                  "Manage"
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4 inline" /> Add
-                  </>
-                )}
-
-              </button>
-            </div>
-              {selectedTags.length < 1 ? (
- <p className="text-xs text-gray-500">Add tags to help you organize and find properties easily</p>) : null}
-            
-           
-            {selectedTags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {selectedTags.map((tag, idx) => (
-                  <span
-                    key={idx}
-                    className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 py-4">
+          <div 
+            className="flex items-center justify-between w-full py-4 px-4 border-2 border-gray-300 rounded-xl bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+            onClick={() => setFormData((prev) => ({ ...prev, is_public: prev.is_public === 1 ? 0 : 1 }))}
+          >
+            <label 
+              className="text-base font-medium text-gray-900 cursor-pointer"
+              onClick={(e) => e.preventDefault()}
+            >
+              Make this property visible to everyone
+            </label>
             <input
               type="checkbox"
               id="is_public"
               checked={formData.is_public === 1}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, is_public: e.target.checked ? 1 : 0 }))
-              }
-              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              readOnly
+              onClick={(e) => {
+                e.stopPropagation();
+                setFormData((prev) => ({ ...prev, is_public: prev.is_public === 1 ? 0 : 1 }));
+              }}
+              className="w-5 h-5 text-blue-600 bg-white border-2 border-gray-500 rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer checked:bg-blue-600 checked:border-blue-600"
             />
-            <label htmlFor="is_public" className="text-base font-medium text-gray-900">
-              Make this property visible to everyone
-            </label>
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 pt-3 sm:pt-4">
-            <button
-              type="submit"
-              className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 text-xs sm:text-sm md:text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm"
-            >
-              {property ? 'Update Property' : 'Add Property'}
-            </button>
             <button
               type="button"
               onClick={() => {
@@ -598,183 +592,16 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
             >
               Cancel
             </button>
+            <button
+              type="submit"
+              className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 text-xs sm:text-sm md:text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm"
+            >
+              {property ? 'Update Property' : 'Add Property'}
+            </button>
           </div>
         </form>
       </div>
 
-      {showHighlightModal && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-2 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[95vh] sm:max-h-[80vh] overflow-y-auto animate-slide-up">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900">Select Highlights</h3>
-              <button
-                onClick={() => setShowHighlightModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            <div className="p-4 sm:p-6 space-y-4">
-              <input
-                type="text"
-                placeholder="Add select highlights"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                    toggleHighlight(e.currentTarget.value.trim());
-                    e.currentTarget.value = '';
-                  }
-                }}
-              />
-
-              <div className="flex flex-wrap gap-2">
-                {HIGHLIGHT_OPTIONS.map((highlight) => (
-                  <button
-                    key={highlight}
-                    type="button"
-                    onClick={() => toggleHighlight(highlight)}
-                    className={`px-4 py-2 rounded-xl transition-colors text-sm ${
-                      selectedHighlights.includes(highlight)
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    {highlight}
-                  </button>
-                ))}
-              </div>
-
-              {selectedHighlights.length > 0 && (
-                <div className="pt-4 border-t border-gray-200">
-                  <p className="text-sm font-semibold text-gray-700 mb-3">Selected</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedHighlights.map((highlight) => (
-                      <span
-                        key={highlight}
-                        className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium flex items-center gap-2"
-                      >
-                        {highlight}
-                        <button
-                          type="button"
-                          onClick={() => toggleHighlight(highlight)}
-                          className="hover:bg-blue-100 rounded-full p-0.5"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowHighlightModal(false)}
-                  className="px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
-                >
-                  Done
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowHighlightModal(false)}
-                  className="px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showTagModal && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-2 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[95vh] sm:max-h-[80vh] overflow-y-auto animate-slide-up">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900">Select Tags</h3>
-              <button
-                onClick={() => setShowTagModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            <div className="p-4 sm:p-6 space-y-4">
-              <input
-                type="text"
-                placeholder="Add custom tags"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                    toggleTag(e.currentTarget.value.trim());
-                    e.currentTarget.value = '';
-                  }
-                }}
-              />
-
-              <div className="flex flex-wrap gap-2">
-                {TAG_OPTIONS.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleTag(tag)}
-                    className={`px-4 py-2 rounded-xl transition-colors text-sm ${
-                      selectedTags.includes(tag)
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-
-              {selectedTags.length > 0 && (
-                <div className="pt-4 border-t border-gray-200">
-                  <p className="text-sm font-semibold text-gray-700 mb-3">Selected</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium flex items-center gap-2"
-                      >
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => toggleTag(tag)}
-                          className="hover:bg-blue-100 rounded-full p-0.5"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowTagModal(false)}
-                  className="px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
-                >
-                  Done
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowTagModal(false)}
-                  className="px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
