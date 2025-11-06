@@ -16,6 +16,9 @@ interface PropertyModalProps {
 }
 
 const STORAGE_KEY = 'propnetwork_property_form_draft';
+const LAST_AREA_KEY = 'propnetwork_last_area';
+const LAST_CITY_KEY = 'propnetwork_last_city';
+const LAST_UNIT_KEY = 'propnetwork_last_unit';
 
 export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProps) {
   const [showNoteTooltip, setShowNoteTooltip] = useState(false);
@@ -31,6 +34,19 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
     } catch {}
     return null;
   }, [property]);
+
+  // Load last selected area, city, and unit from localStorage
+  const getLastSelections = useMemo(() => {
+    try {
+      return {
+        area: localStorage.getItem(LAST_AREA_KEY) || '',
+        city: localStorage.getItem(LAST_CITY_KEY) || '',
+        unit: localStorage.getItem(LAST_UNIT_KEY) || '',
+      };
+    } catch {
+      return { area: '', city: '', unit: '' };
+    }
+  }, []);
 
   // Get user settings for defaults
   const userSettings = getUserSettings();
@@ -55,14 +71,14 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
       public_rating: property.public_rating || 0,
       my_rating: property.my_rating || 0,
     } : (draftData || {
-      city: userSettings.city || 'Panipat',
-      area: userSettings.preferredAreas.length > 0 ? userSettings.preferredAreas[0] : '',
+      city: getLastSelections.city || userSettings.city || 'Panipat',
+      area: getLastSelections.area || (userSettings.preferredAreas.length > 0 ? userSettings.preferredAreas[0] : ''),
       type: userSettings.preferredPropertyTypes.length > 0 ? userSettings.preferredPropertyTypes[0] : '',
       description: '',
       note_private: '',
       min_size: undefined,
       size_max: undefined,
-      size_unit: userSettings.defaultSizeUnit || 'Gaj',
+      size_unit: getLastSelections.unit || userSettings.defaultSizeUnit || 'Gaj',
       price_min: undefined,
       price_max: undefined,
       location: '',
@@ -132,6 +148,31 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
       return () => clearTimeout(timeoutId);
     }
   }, [formData, showSizeRange, showPriceRange, property]);
+
+  // Save last selected area, city, and unit to localStorage whenever they change
+  useEffect(() => {
+    if (!property && formData.area) {
+      try {
+        localStorage.setItem(LAST_AREA_KEY, formData.area);
+      } catch {}
+    }
+  }, [formData.area, property]);
+
+  useEffect(() => {
+    if (!property && formData.city) {
+      try {
+        localStorage.setItem(LAST_CITY_KEY, formData.city);
+      } catch {}
+    }
+  }, [formData.city, property]);
+
+  useEffect(() => {
+    if (!property && formData.size_unit) {
+      try {
+        localStorage.setItem(LAST_UNIT_KEY, formData.size_unit);
+      } catch {}
+    }
+  }, [formData.size_unit, property]);
 
   useEffect(() => {
     if (property) {

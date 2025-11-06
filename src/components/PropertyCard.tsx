@@ -136,8 +136,8 @@ export function PropertyCard({
           </h3>
         </div>
         <div className="flex-shrink-0">
-          <div className="flex items-center gap-0 text-lg sm:text-2xl font-bold text-gray-900">
-            <IndianRupee className="w-4 h-4 sm:w-5 sm:h-5" />
+          <div className="flex items-center gap-0 text-sm sm:text-base font-semibold text-gray-900">
+            <IndianRupee className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>{priceText}</span>
           </div>
         </div>

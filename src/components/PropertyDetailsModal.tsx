@@ -201,7 +201,7 @@ export function PropertyDetailsModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[98vh] sm:max-h-[90vh] overflow-y-auto animate-slide-up">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{property.type}</h2>
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{property.type} #{property.id}</h2>
           <button
             onClick={onClose}
             className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full transition-colors"
