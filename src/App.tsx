@@ -4,7 +4,7 @@ import { Plus, Home, Globe, ChevronDown, User } from 'lucide-react';
 import { PropertyCard } from './components/PropertyCard';
 import { PropertyCardSkeleton } from './components/PropertyCardSkeleton';
 import { PropertyModal } from './components/PropertyModal';
-import { PropertyDetailsModal } from './components/PropertyDetailsModal';
+import { PropertyDetailsModal } from './ciomponents/PropertyDetailsModal';
 import { ContactModal } from './components/ContactModal';
 import { SearchFilter } from './components/SearchFilter';
 import { ProfilePage } from './components/ProfilePage';
@@ -1007,7 +1007,7 @@ function MainAppContent({
           {loading ? (
             <div className="space-y-3 sm:space-y-4">
               {[...Array(3)].map((_, index) => (
-                <PropertyCardSkeleton key={index} />
+                <PropertyCardSkeleton key={index} noTopBorder={index === 0} />
               ))}
             </div>
           ) : currentProperties.length === 0 ? (

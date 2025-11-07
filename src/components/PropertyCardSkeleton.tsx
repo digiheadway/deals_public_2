@@ -1,6 +1,10 @@
-export function PropertyCardSkeleton() {
+interface PropertyCardSkeletonProps {
+  noTopBorder?: boolean;
+}
+
+export function PropertyCardSkeleton({ noTopBorder = false }: PropertyCardSkeletonProps = {}) {
   return (
-    <div className="w-full bg-white rounded-lg shadow-md p-3 sm:p-4 border-l-4 border-l-gray-300 border-t border-r border-b border-gray-200 relative">
+    <div className={`w-full bg-white rounded-lg shadow-md p-3 sm:p-4 border-l-4 border-l-gray-300 border-r border-b border-gray-200 ${noTopBorder ? '' : 'border-t'} relative`}>
       <div className="flex items-start gap-2 sm:gap-3 mb-1 sm:mb-0">
         <div className="flex-1 min-w-0">
           <div className="h-5 sm:h-6 bg-gray-200 rounded animate-shimmer mb-2 w-3/4"></div>

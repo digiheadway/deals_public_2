@@ -307,11 +307,11 @@ export function PropertyDetailsModal({
 
           {property.description && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <h3 className="text-sm text-gray-600 mb-2 flex items-center gap-2">
                 <FileText className="w-3.5 h-3.5 text-gray-500" />
                 Description
               </h3>
-              <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
+              <p className="text-sm sm:text-base font-semibold text-gray-900 leading-relaxed">
                 {property.description}
               </p>
             </div>
@@ -319,7 +319,7 @@ export function PropertyDetailsModal({
 
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs sm:text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <h3 className="text-xs sm:text-sm text-gray-600 flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-gray-500" />
                 Highlights
               </h3>
@@ -401,7 +401,7 @@ export function PropertyDetailsModal({
 
           {isOwned && property.note_private && (
             <div className="pt-2 sm:pt-2 border-t border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <h3 className="text-sm text-gray-600 mb-2 flex items-center gap-2">
                 <FileText className="w-3.5 h-3.5 text-gray-500" />
                 Note{' '}
                 <span 
@@ -419,7 +419,7 @@ export function PropertyDetailsModal({
                   )}
                 </span>
               </h3>
-              <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
+              <p className="text-sm sm:text-base font-semibold text-gray-900 leading-relaxed">
                 {property.note_private}
               </p>
             </div>
