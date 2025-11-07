@@ -3,7 +3,7 @@ import { X, Copy, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee
 import { Property } from '../types/property';
 import { formatPrice, formatPriceWithLabel } from '../utils/priceFormatter';
 import { HIGHLIGHT_OPTIONS, TAG_OPTIONS } from '../utils/filterOptions';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../contexts/AuthContext';
@@ -897,7 +897,11 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
     return property.location_accuracy ? parseFloat(property.location_accuracy) || 500 : 500;
   });
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [isSatelliteView, setIsSatelliteView] = useState(false);
+  // Load saved map view preference from localStorage, default to map view
+  const [isSatelliteView, setIsSatelliteView] = useState(() => {
+    const saved = localStorage.getItem('mapViewPreference');
+    return saved === 'satellite';
+  });
 
   // Initialize map center based on user's default city or property city
   useEffect(() => {
@@ -1101,12 +1105,28 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
                     <TileLayerSwitcher isSatelliteView={isSatelliteView} />
                     <MapClickHandler onMapClick={handleMapClick} />
                     {selectedPosition && (
-                      <Marker position={selectedPosition}>
-                        <Popup>
-                          Selected Location<br />
-                          {selectedPosition[0].toFixed(6)}, {selectedPosition[1].toFixed(6)}
-                        </Popup>
-                      </Marker>
+                      <>
+                        {/* Location Accuracy Radius Circle */}
+                        <Circle
+                          center={selectedPosition}
+                          radius={radius}
+                          pathOptions={{
+                            color: '#3b82f6',
+                            fillColor: '#3b82f6',
+                            fillOpacity: 0.1,
+                            weight: 2,
+                            opacity: 0.5,
+                          }}
+                        />
+                        <Marker position={selectedPosition}>
+                          <Popup>
+                            Selected Location<br />
+                            {selectedPosition[0].toFixed(6)}, {selectedPosition[1].toFixed(6)}
+                            <br />
+                            Accuracy: {radius}m
+                          </Popup>
+                        </Marker>
+                      </>
                     )}
                   </MapContainer>
                   
@@ -1115,7 +1135,12 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
                     {/* Satellite View Toggle Button - Top Right */}
                     <button
                       type="button"
-                      onClick={() => setIsSatelliteView(!isSatelliteView)}
+                      onClick={() => {
+                        const newView = !isSatelliteView;
+                        setIsSatelliteView(newView);
+                        // Save preference immediately
+                        localStorage.setItem('mapViewPreference', newView ? 'satellite' : 'map');
+                      }}
                       className={`absolute top-2 right-2 pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg shadow-lg transition-colors ${
                         isSatelliteView
                           ? 'bg-green-600 text-white hover:bg-green-700'
@@ -1228,30 +1253,74 @@ interface LocationViewModalProps {
 // Component to update map bounds to show both property and user location
 function MapBoundsUpdater({ propertyLocation, userLocation, hasUserLocation, isInitialLoad }: { propertyLocation: [number, number]; userLocation: [number, number] | null; hasUserLocation: boolean; isInitialLoad: boolean }) {
   const map = useMap();
+  
   useEffect(() => {
-    // Only update bounds on initial load or when user location first becomes available
-    if (isInitialLoad) {
-      if (hasUserLocation && userLocation) {
-        // Create bounds that include both locations
-        const bounds = L.latLngBounds([propertyLocation, userLocation]);
-        map.fitBounds(bounds, { padding: [50, 50] });
-      } else {
-        // Just center on property location
-        map.setView(propertyLocation, 15);
+    // Invalidate map size multiple times to ensure it renders correctly in modal
+    const invalidateSize = () => {
+      try {
+        map.invalidateSize();
+      } catch (e) {
+        console.log('Map invalidateSize error:', e);
       }
+    };
+
+    // Initial invalidation
+    invalidateSize();
+    
+    // Multiple invalidations to handle modal animation
+    const timers = [
+      setTimeout(invalidateSize, 100),
+      setTimeout(invalidateSize, 300),
+      setTimeout(invalidateSize, 500),
+    ];
+    
+    // Only update bounds on initial load
+    if (isInitialLoad) {
+      const updateBounds = () => {
+        try {
+          if (hasUserLocation && userLocation) {
+            // Create bounds that include both locations
+            const bounds = L.latLngBounds([propertyLocation, userLocation]);
+            map.fitBounds(bounds, { padding: [50, 50] });
+          } else {
+            // Just center on property location
+            map.setView(propertyLocation, 15);
+          }
+          invalidateSize();
+        } catch (e) {
+          console.log('Map bounds update error:', e);
+        }
+      };
+      
+      setTimeout(updateBounds, 400);
     }
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
   }, [propertyLocation, userLocation, hasUserLocation, isInitialLoad, map]);
+  
   return null;
 }
 
 function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogleMaps }: LocationViewModalProps) {
+  // Load saved map view preference from localStorage, default to map view (false = map, true = satellite)
+  const [isSatelliteView, setIsSatelliteView] = useState(() => {
+    const saved = localStorage.getItem('mapViewPreference');
+    return saved === 'satellite';
+  });
+  
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(true);
-  const [isSatelliteView, setIsSatelliteView] = useState(true); // Default to satellite view
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const mapCenter: [number, number] = userLocation 
     ? [(propertyLocation.lat + userLocation[0]) / 2, (propertyLocation.lng + userLocation[1]) / 2]
     : [propertyLocation.lat, propertyLocation.lng];
+
+  // Save view preference to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('mapViewPreference', isSatelliteView ? 'satellite' : 'map');
+  }, [isSatelliteView]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -1261,16 +1330,47 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
     };
   }, []);
 
-  // Get user's current location
+  // Invalidate map size when modal becomes visible (important for Leaflet in modals)
   useEffect(() => {
+    const timer = setTimeout(() => {
+      // Find the map container and invalidate its size
+      const mapElements = document.querySelectorAll('.leaflet-container');
+      mapElements.forEach((element) => {
+        const leafletElement = element as any;
+        if (leafletElement._leaflet_id) {
+          // Get the map instance from Leaflet's internal registry
+          const allMaps = (L as any).map._instances || {};
+          const mapInstance = Object.values(allMaps).find((map: any) => 
+            map.getContainer() === element
+          ) as any;
+          if (mapInstance) {
+            mapInstance.invalidateSize();
+          }
+        }
+      });
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Get user's current location (non-blocking - map will render immediately)
+  useEffect(() => {
+    setIsGettingLocation(true);
+    
     if (!navigator.geolocation) {
       setIsGettingLocation(false);
       setIsInitialLoad(false);
       return;
     }
 
+    // Set timeout to mark as not getting location after initial delay
+    const timeoutId = setTimeout(() => {
+      setIsGettingLocation(false);
+    }, 2000);
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        clearTimeout(timeoutId);
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setUserLocation([lat, lng]);
@@ -1279,6 +1379,7 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
         setTimeout(() => setIsInitialLoad(false), 500);
       },
       (error) => {
+        clearTimeout(timeoutId);
         setIsGettingLocation(false);
         setIsInitialLoad(false);
         // Silently fail - user location is optional
@@ -1286,10 +1387,12 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 5000,
         maximumAge: 0
       }
     );
+
+    return () => clearTimeout(timeoutId);
   }, []);
 
 
@@ -1322,7 +1425,7 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 mobile-modal-container">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-4xl mobile-modal-content sm:max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-4xl mobile-modal-content sm:max-h-[90vh] h-[90vh] sm:h-auto overflow-hidden flex flex-col animate-slide-up">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
           <h3 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
             <MapIcon className="w-5 h-5" />
@@ -1336,23 +1439,25 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
           </button>
         </div>
 
-        <div className="flex-1 relative min-h-[400px] sm:min-h-[500px]">
-          {isGettingLocation ? (
-            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                <p className="text-sm text-gray-600">Loading map and your location...</p>
+        <div className="flex-1 relative overflow-hidden" style={{ minHeight: '400px' }}>
+          <div className="w-full h-full relative" style={{ height: '100%', minHeight: '400px' }}>
+            {/* Loading overlay - shows while getting location but map renders underneath */}
+            {isGettingLocation && (
+              <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                  <p className="text-sm text-gray-600">Getting your location...</p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <>
-              <MapContainer
-                center={mapCenter}
-                zoom={userLocation ? 13 : 15}
-                className="h-full w-full"
-                scrollWheelZoom={true}
-                style={{ position: 'relative', zIndex: 1 }}
-              >
+            )}
+            
+            <MapContainer
+              center={mapCenter}
+              zoom={userLocation ? 13 : 15}
+              className="h-full w-full"
+              scrollWheelZoom={true}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, height: '100%', width: '100%' }}
+            >
                 <MapBoundsUpdater 
                   propertyLocation={[propertyLocation.lat, propertyLocation.lng]} 
                   userLocation={userLocation}
@@ -1360,6 +1465,21 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
                   isInitialLoad={isInitialLoad}
                 />
                 <TileLayerSwitcher isSatelliteView={isSatelliteView} />
+                
+                {/* Property Location Radius Circle */}
+                {property.location_accuracy && (
+                  <Circle
+                    center={[propertyLocation.lat, propertyLocation.lng]}
+                    radius={parseFloat(property.location_accuracy) || 500}
+                    pathOptions={{
+                      color: '#3b82f6',
+                      fillColor: '#3b82f6',
+                      fillOpacity: 0.1,
+                      weight: 2,
+                      opacity: 0.5,
+                    }}
+                  />
+                )}
                 
                 {/* Property Location Marker */}
                 <Marker 
@@ -1375,6 +1495,11 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
                       <p className="text-xs text-gray-500">
                         {propertyLocation.lat.toFixed(6)}, {propertyLocation.lng.toFixed(6)}
                       </p>
+                      {property.location_accuracy && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Accuracy: {property.location_accuracy}m
+                        </p>
+                      )}
                     </div>
                   </Popup>
                 </Marker>
@@ -1395,30 +1520,44 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
                     </Popup>
                   </Marker>
                 )}
-              </MapContainer>
-              
-              {/* Map Control Buttons Container */}
-              <div className="absolute inset-0 pointer-events-none z-[2]">
-                {/* Satellite View Toggle Button - Top Right */}
-                <button
-                  type="button"
-                  onClick={() => setIsSatelliteView(!isSatelliteView)}
-                  className={`absolute top-2 right-2 pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg shadow-lg transition-colors ${
-                    isSatelliteView
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                  }`}
-                  title={isSatelliteView ? 'Switch to Map View' : 'Switch to Satellite View'}
-                >
-                  <Satellite 
-                    className="w-4 h-4 flex-shrink-0" 
-                    strokeWidth={2.5}
-                  />
-                  <span className="hidden sm:inline">{isSatelliteView ? 'Satellite' : 'Map'}</span>
-                </button>
-              </div>
-            </>
-          )}
+            </MapContainer>
+            
+            {/* Map Control Buttons Container */}
+            <div className="absolute inset-0 pointer-events-none z-[10]" style={{ pointerEvents: 'none' }}>
+              {/* Satellite View Toggle Button - Top Right */}
+              <button
+                type="button"
+                onClick={() => {
+                  const newView = !isSatelliteView;
+                  setIsSatelliteView(newView);
+                  // Save preference immediately
+                  localStorage.setItem('mapViewPreference', newView ? 'satellite' : 'map');
+                  // Invalidate map size after view change
+                  setTimeout(() => {
+                    const mapElement = document.querySelector('.leaflet-container') as any;
+                    if (mapElement && mapElement._leaflet_id) {
+                      const mapInstance = (window as any).L?.maps?.[mapElement._leaflet_id];
+                      if (mapInstance) {
+                        mapInstance.invalidateSize();
+                      }
+                    }
+                  }, 100);
+                }}
+                className={`absolute top-2 right-2 pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg shadow-lg transition-colors ${
+                  isSatelliteView
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                }`}
+                title={isSatelliteView ? 'Switch to Map View' : 'Switch to Satellite View'}
+              >
+                <Satellite 
+                  className="w-4 h-4 flex-shrink-0" 
+                  strokeWidth={2.5}
+                />
+                <span className="hidden sm:inline">{isSatelliteView ? 'Satellite' : 'Map'}</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Full Width Button to Open in Google Maps */}

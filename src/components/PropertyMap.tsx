@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import { Property } from '../types/property';
 import { formatPrice } from '../utils/priceFormatter';
 import { Navigation, Satellite } from 'lucide-react';
@@ -47,7 +47,11 @@ function TileLayerSwitcher({ isSatelliteView }: { isSatelliteView: boolean }) {
 }
 
 export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerClick }: PropertyMapProps) {
-  const [isSatelliteView, setIsSatelliteView] = useState(false);
+  // Load saved map view preference from localStorage, default to map view
+  const [isSatelliteView, setIsSatelliteView] = useState(() => {
+    const saved = localStorage.getItem('mapViewPreference');
+    return saved === 'satellite';
+  });
   const [mapCenter, setMapCenter] = useState<[number, number]>(center);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   
@@ -113,12 +117,26 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
       >
         <MapUpdater center={mapCenter} />
         <TileLayerSwitcher isSatelliteView={isSatelliteView} />
-        {propertiesWithCoords.map((property) => {
+        {propertiesWithCoords.flatMap((property) => {
           const coords = property.location.split(',').map((c) => parseFloat(c.trim()));
           if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-            return (
+            const radius = property.location_accuracy ? parseFloat(property.location_accuracy) || 500 : 500;
+            return [
+              // Location Accuracy Radius Circle
+              <Circle
+                key={`circle-${property.id}`}
+                center={[coords[0], coords[1]]}
+                radius={radius}
+                pathOptions={{
+                  color: '#3b82f6',
+                  fillColor: '#3b82f6',
+                  fillOpacity: 0.1,
+                  weight: 2,
+                  opacity: 0.5,
+                }}
+              />,
               <Marker 
-                key={property.id} 
+                key={`marker-${property.id}`}
                 position={[coords[0], coords[1]]}
                 eventHandlers={{
                   click: () => {
@@ -140,6 +158,11 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
                     <p className="text-xs text-gray-500 mt-1">
                       {property.min_size}-{property.size_max} {property.size_unit}
                     </p>
+                    {property.location_accuracy && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        Accuracy: {property.location_accuracy}m
+                      </p>
+                    )}
                     {onMarkerClick && (
                       <button
                         onClick={(e) => {
@@ -154,9 +177,9 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
                   </div>
                 </Popup>
               </Marker>
-            );
+            ];
           }
-          return null;
+          return [];
         })}
       </MapContainer>
 
@@ -165,7 +188,12 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
         {/* Satellite View Toggle Button - Top Right */}
         <button
           type="button"
-          onClick={() => setIsSatelliteView(!isSatelliteView)}
+          onClick={() => {
+            const newView = !isSatelliteView;
+            setIsSatelliteView(newView);
+            // Save preference immediately
+            localStorage.setItem('mapViewPreference', newView ? 'satellite' : 'map');
+          }}
           className={`absolute top-2 right-2 pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg shadow-lg transition-colors ${
             isSatelliteView
               ? 'bg-green-600 text-white hover:bg-green-700'
