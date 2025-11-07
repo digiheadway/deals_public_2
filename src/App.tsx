@@ -392,13 +392,16 @@ function App() {
     const shareUrl = property.is_public === 1 
       ? `${window.location.origin}/property/${property.id}`
       : undefined;
-    const text = `${property.type} in ${property.area}, ${property.city}\n${property.description}\nSize: ${sizeText}\nPrice: ${priceText}${shareUrl ? `\n\nView: ${shareUrl}` : ''}`;
+    // For navigator.share, don't include URL in text (it's passed separately)
+    // For clipboard fallback, include URL in text
+    const textForShare = `${property.type} in ${property.area}, ${property.city}\n${property.description}\nSize: ${sizeText}\nPrice: ${priceText}`;
+    const textForClipboard = `${textForShare}${shareUrl ? `\n\nView: ${shareUrl}` : ''}`;
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: `${property.type} - ${property.area}`,
-          text,
+          text: textForShare,
           url: shareUrl,
         });
       } catch (error) {
@@ -407,7 +410,7 @@ function App() {
         }
       }
     } else {
-      navigator.clipboard.writeText(text);
+      navigator.clipboard.writeText(textForClipboard);
       showToast('Property details copied to clipboard', 'success');
     }
   };
