@@ -12,6 +12,7 @@ import { HomePage } from './components/HomePage';
 import { AuthPage } from './components/AuthPage';
 import { PublicPropertyPage } from './components/PublicPropertyPage';
 import { Toast } from './components/Toast';
+import { InstallPrompt } from './components/InstallPrompt';
 import { useAuth } from './contexts/AuthContext';
 import { propertyApi } from './services/api';
 import { Property, PropertyFormData, FilterOptions } from './types/property';
@@ -1079,12 +1080,14 @@ function MainAppContent({
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
+      <InstallPrompt />
+
       <button
         onClick={() => {
           setEditingProperty(null);
           setShowModal(true);
         }}
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center z-40 hover:scale-110 duration-200"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 md:bottom-6 md:right-6 w-12 h-12 sm:w-14 sm:h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center z-40 hover:scale-110 duration-200"
         title="Add Property"
       >
         <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
