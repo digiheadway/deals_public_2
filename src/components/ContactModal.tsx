@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Send } from 'lucide-react';
 import { Property } from '../types/property';
 import { formatPrice } from '../utils/priceFormatter';
+import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 
 interface ContactModalProps {
   property: Property;
@@ -60,9 +61,17 @@ export function ContactModal({
     }
   };
 
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    lockBodyScroll();
+    return () => {
+      unlockBodyScroll();
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[98vh] sm:max-h-[90vh] overflow-y-auto animate-slide-up">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 mobile-modal-container">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md mobile-modal-content sm:max-h-[90vh] overflow-y-auto animate-slide-up">
         <div className="border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">Ask a Question</h2>
           <button

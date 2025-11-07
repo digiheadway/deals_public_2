@@ -8,6 +8,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../contexts/AuthContext';
 import type { LeafletMouseEvent } from 'leaflet';
+import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 
 // Fix Leaflet default icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -212,9 +213,17 @@ export function PropertyDetailsModal({
     setShowTagModal(false);
   };
 
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[98vh] sm:max-h-[90vh] overflow-y-auto animate-slide-up">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 mobile-modal-container">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl mobile-modal-content sm:max-h-[90vh] overflow-y-auto animate-slide-up">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between rounded-t-2xl">
           <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{property.type} #{property.id}</h2>
           <button
@@ -575,8 +584,8 @@ export function PropertyDetailsModal({
       </div>
 
       {showHighlightModal && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[98vh] sm:max-h-[80vh] overflow-y-auto animate-slide-up">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 mobile-modal-container">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md mobile-modal-content sm:max-h-[80vh] overflow-y-auto animate-slide-up">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-2xl">
               <h3 className="text-lg sm:text-xl font-bold text-gray-900">Select Highlights</h3>
               <button
@@ -670,8 +679,8 @@ export function PropertyDetailsModal({
       )}
 
       {showTagModal && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[98vh] sm:max-h-[80vh] overflow-y-auto animate-slide-up">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 mobile-modal-container">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md mobile-modal-content sm:max-h-[80vh] overflow-y-auto animate-slide-up">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-2xl">
               <h3 className="text-lg sm:text-xl font-bold text-gray-900">Select Tags</h3>
               <button
@@ -843,6 +852,14 @@ async function geocodeCity(cityName: string): Promise<[number, number] | null> {
 
 function LocationModal({ property, onClose, onSave }: LocationModalProps) {
   const { user } = useAuth();
+  
+  // Lock body scroll when modal is open (nested modal, so this increments the counter)
+  useEffect(() => {
+    lockBodyScroll();
+    return () => {
+      unlockBodyScroll();
+    };
+  }, []);
   const [selectedPosition, setSelectedPosition] = useState<[number, number] | null>(() => {
     // Check if property has location coordinates
     const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((property.location || '').trim());
@@ -1028,8 +1045,8 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[98vh] sm:max-h-[90vh] overflow-y-auto animate-slide-up">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 mobile-modal-container">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl mobile-modal-content sm:max-h-[90vh] overflow-y-auto animate-slide-up">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
           <h3 className="text-lg sm:text-xl font-bold text-gray-900">
             {hasLocationCoordinates(property.location) ? 'Edit Location' : 'Add Location'}

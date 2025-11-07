@@ -67,3 +67,37 @@
   );
   background-size: 1000px 100%;
 }
+
+/* Mobile viewport fix for modals */
+@supports (max-height: 100dvh) {
+  .mobile-modal-container {
+    max-height: 100dvh;
+  }
+  .mobile-modal-content {
+    max-height: calc(100dvh - 2rem);
+  }
+}
+
+@supports not (max-height: 100dvh) {
+  .mobile-modal-container {
+    max-height: -webkit-fill-available;
+    max-height: 100vh;
+  }
+  .mobile-modal-content {
+    max-height: calc(-webkit-fill-available - 2rem);
+    max-height: calc(100vh - 2rem);
+  }
+}
+
+/* Prevent body scroll when modal is open - handled by scrollLock utility */
+
+/* Hide scrollbar but keep scrolling functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+  -webkit-overflow-scrolling: touch;  /* Smooth scrolling on iOS */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}

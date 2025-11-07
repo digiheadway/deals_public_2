@@ -151,24 +151,21 @@ export function PropertyCard({
 
       <div className="space-y-1.5 sm:space-y-2">
         {property.highlights && (
-          <div className="flex flex-wrap gap-1">
-            {property.highlights.split(',').slice(0, 3).map((highlight, idx) => {
-              const Icon = getIconForHighlight(highlight);
+          <div className="flex flex-nowrap gap-1 overflow-x-auto scrollbar-hide pb-1">
+            {property.highlights.split(',').map((highlight, idx) => {
+              const trimmedHighlight = highlight.trim();
+              if (!trimmedHighlight) return null;
+              const Icon = getIconForHighlight(trimmedHighlight);
               return (
                 <span
                   key={idx}
-                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs text-gray-700 bg-gray-100 rounded flex items-center gap-1`}
+                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs text-gray-700 bg-gray-100 rounded flex items-center gap-1 flex-shrink-0 whitespace-nowrap`}
                 >
-                  <Icon className="w-3 h-3" />
-                  {highlight.trim()}
+                  <Icon className="w-3 h-3 flex-shrink-0" />
+                  {trimmedHighlight}
                 </span>
               );
             })}
-            {property.highlights.split(',').length > 3 && (
-              <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs bg-gray-100 text-gray-700 rounded">
-                +{property.highlights.split(',').length - 3}
-              </span>
-            )}
           </div>
         )}
 

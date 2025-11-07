@@ -104,12 +104,6 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
 
   return (
     <div className="h-full w-full relative z-[8]">
-      <div className="absolute top-4 left-4 z-[10] bg-white px-3 py-2 rounded-lg shadow-lg">
-        <p className="text-sm font-medium text-gray-900">
-          Live View ({propertiesWithCoords.length})
-        </p>
-      </div>
-      
       <MapContainer
         center={mapCenter}
         zoom={13}
