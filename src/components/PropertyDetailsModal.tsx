@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Copy, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapPin, FileText, Sparkles, Tag, Lock, Globe, ChevronDown, Star, Building, CornerDownRight, Navigation, Shield, Wifi, Calendar, AlertCircle, TreePine, Home, TrendingUp, DollarSign, Info, Satellite, Map as MapIcon } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Copy, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapPin, FileText, Sparkles, Tag, Lock, Globe, ChevronDown, Star, Building, CornerDownRight, Navigation, Shield, Wifi, Calendar, AlertCircle, TreePine, Home, TrendingUp, DollarSign, Info, Satellite, Map as MapIcon, Search } from 'lucide-react';
 import { Property } from '../types/property';
 import { formatPrice, formatPriceWithLabel } from '../utils/priceFormatter';
 import { HIGHLIGHT_OPTIONS, TAG_OPTIONS } from '../utils/filterOptions';
@@ -844,24 +844,293 @@ function TileLayerSwitcher({ isSatelliteView }: { isSatelliteView: boolean }) {
   );
 }
 
-// Geocode city name to coordinates using OpenStreetMap Nominatim (free, no key required)
+// Geocode city name to coordinates using CORS proxy
 async function geocodeCity(cityName: string): Promise<[number, number] | null> {
   try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityName + ', Haryana, India')}&limit=1`,
-      {
-        headers: {
-          'User-Agent': 'PropertyNetwork/1.0' // Required by Nominatim
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityName + ', Haryana, India')}&limit=1`;
+    
+    // Try CORS proxy services
+    const proxyServices = [
+      (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    ];
+    
+    for (const getProxyUrl of proxyServices) {
+      try {
+        const proxyUrl = getProxyUrl(url);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const response = await fetch(proxyUrl, {
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const jsonData = typeof data === 'string' ? JSON.parse(data) : data;
+          if (jsonData && jsonData.length > 0) {
+            return [parseFloat(jsonData[0].lat), parseFloat(jsonData[0].lon)];
+          }
         }
+      } catch (error) {
+        continue; // Try next proxy
       }
-    );
-    const data = await response.json();
-    if (data && data.length > 0) {
-      return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
     }
   } catch (error) {
     console.error('Geocoding error:', error);
   }
+  return null;
+}
+
+// Search for places using multiple CORS proxy services as fallback
+async function searchPlaces(query: string): Promise<Array<{ display_name: string; lat: string; lon: string }>> {
+  try {
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
+    
+    const searchQuery = query.trim();
+    const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery + ', India')}&limit=5&addressdetails=1`;
+    
+    // List of CORS proxy services to try (in order of preference)
+    const proxyServices = [
+      // Service 1: allorigins.win (reliable, free)
+      (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      // Service 2: corsproxy.io (backup)
+      (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      // Service 3: cors-anywhere (may require setup, but trying anyway)
+      (url: string) => `https://cors-anywhere.herokuapp.com/${url}`,
+    ];
+    
+    // Try each proxy service
+    for (const getProxyUrl of proxyServices) {
+      try {
+        const proxyUrl = getProxyUrl(nominatimUrl);
+        console.log('Trying proxy:', proxyUrl.substring(0, 50) + '...');
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch(proxyUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Handle case where proxy returns wrapped response
+          const jsonData = typeof data === 'string' ? JSON.parse(data) : data;
+          
+          if (Array.isArray(jsonData)) {
+            const results = jsonData.map((item: any) => ({
+              display_name: item.display_name || item.name || `${item.lat}, ${item.lon}`,
+              lat: item.lat?.toString() || '',
+              lon: item.lon?.toString() || '',
+            })).filter((item: any) => item.lat && item.lon && item.display_name);
+            
+            if (results.length > 0) {
+              console.log('Search successful with proxy, found', results.length, 'results');
+              return results;
+            }
+          }
+        } else {
+          console.log('Proxy returned error:', response.status, response.statusText);
+        }
+      } catch (proxyError: any) {
+        if (proxyError.name === 'AbortError') {
+          console.log('Request timed out, trying next proxy...');
+        } else {
+          console.log('Proxy failed:', proxyError.message);
+        }
+        // Continue to next proxy
+        continue;
+      }
+    }
+    
+    console.warn('All proxy services failed. Search is not available due to CORS restrictions.');
+    return [];
+  } catch (error) {
+    console.error('Search error:', error);
+    return [];
+  }
+}
+
+// Extract coordinates from various URL formats
+function extractCoordsFromUrl(url: string): [number, number] | null {
+  try {
+    // Try to extract from Google Maps long URL patterns
+    // Pattern 1: @lat,lng or @lat,lng,z
+    const atPattern = /@(-?\d+\.?\d*),(-?\d+\.?\d*)/;
+    const atMatch = url.match(atPattern);
+    if (atMatch) {
+      const lat = parseFloat(atMatch[1]);
+      const lng = parseFloat(atMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return [lat, lng];
+      }
+    }
+
+    // Pattern 2: ?q=lat,lng or ?q=lat+lng
+    const qPattern = /[?&]q=(-?\d+\.?\d*)[,+](-?\d+\.?\d*)/;
+    const qMatch = url.match(qPattern);
+    if (qMatch) {
+      const lat = parseFloat(qMatch[1]);
+      const lng = parseFloat(qMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return [lat, lng];
+      }
+    }
+
+    // Pattern 3: ll=lat,lng
+    const llPattern = /[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/;
+    const llMatch = url.match(llPattern);
+    if (llMatch) {
+      const lat = parseFloat(llMatch[1]);
+      const lng = parseFloat(llMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return [lat, lng];
+      }
+    }
+
+    // Pattern 4: center=lat,lng
+    const centerPattern = /[?&]center=(-?\d+\.?\d*),(-?\d+\.?\d*)/;
+    const centerMatch = url.match(centerPattern);
+    if (centerMatch) {
+      const lat = parseFloat(centerMatch[1]);
+      const lng = parseFloat(centerMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return [lat, lng];
+      }
+    }
+
+    // Pattern 5: /@lat,lng or /lat,lng
+    const slashPattern = /\/([-]?\d+\.?\d*),([-]?\d+\.?\d*)/;
+    const slashMatch = url.match(slashPattern);
+    if (slashMatch) {
+      const lat = parseFloat(slashMatch[1]);
+      const lng = parseFloat(slashMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return [lat, lng];
+      }
+    }
+  } catch (error) {
+    console.error('Error extracting coordinates from URL:', error);
+  }
+  return null;
+}
+
+// Resolve short Google Maps URL and extract coordinates
+async function resolveGoogleMapsUrl(shortUrl: string): Promise<[number, number] | null> {
+  try {
+    // First, try to extract coordinates directly from URL (works for long URLs)
+    const directCoords = extractCoordsFromUrl(shortUrl);
+    if (directCoords) {
+      return directCoords;
+    }
+
+    // For short URLs (maps.app.goo.gl or goo.gl), we need to resolve them
+    // However, due to CORS, we can't easily do this from the browser
+    // We'll try using a CORS proxy, but this may not always work
+    try {
+      // Try to fetch with redirect following
+      // Some browsers will follow redirects and give us the final URL
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch(shortUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // Try to extract from the final URL
+      const finalUrl = response.url || shortUrl;
+      const urlCoords = extractCoordsFromUrl(finalUrl);
+      if (urlCoords) {
+        return urlCoords;
+      }
+
+      // If URL doesn't have coordinates, try to extract from HTML
+      // This works if the server allows it (may be blocked by CORS)
+      try {
+        const html = await response.text();
+        const htmlCoords = extractCoordsFromUrl(html);
+        if (htmlCoords) {
+          return htmlCoords;
+        }
+      } catch (htmlError) {
+        // Can't read HTML, that's okay
+        console.log('Could not read HTML response');
+      }
+    } catch (fetchError: any) {
+      // CORS or network error - this is expected for cross-origin requests
+      if (fetchError.name === 'AbortError') {
+        console.log('Request timed out');
+      } else {
+        console.log('Could not resolve short URL. Please use the full Google Maps URL with coordinates, or paste coordinates directly.');
+      }
+    }
+  } catch (error) {
+    console.error('Error resolving Google Maps URL:', error);
+  }
+  return null;
+}
+
+// Parse input to determine if it's a URL, lat/long, or search query
+async function parseLocationInput(input: string): Promise<[number, number] | null> {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  // Check if it's a lat/long pair
+  const latLongPattern = /^-?\d+\.?\d*,-?\d+\.?\d*$/;
+  if (latLongPattern.test(trimmed)) {
+    const parts = trimmed.split(',').map(c => parseFloat(c.trim()));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      const lat = parts[0];
+      const lng = parts[1];
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return [lat, lng];
+      }
+    }
+  }
+
+  // Check if it's a URL
+  try {
+    const url = new URL(trimmed);
+    // Check if it's a Google Maps URL
+    if (url.hostname.includes('google.com') || url.hostname.includes('maps.app.goo.gl') || url.hostname.includes('goo.gl')) {
+      const coords = await resolveGoogleMapsUrl(trimmed);
+      if (coords) {
+        return coords;
+      }
+    } else {
+      // Try to extract coordinates from any URL
+      const coords = extractCoordsFromUrl(trimmed);
+      if (coords) {
+        return coords;
+      }
+    }
+  } catch (e) {
+    // Not a valid URL, treat as search query
+  }
+
+  // If it's not a URL or coordinates, treat as search query and geocode it
+  const searchResults = await searchPlaces(trimmed);
+  if (searchResults && searchResults.length > 0) {
+    const firstResult = searchResults[0];
+    return [parseFloat(firstResult.lat), parseFloat(firstResult.lon)];
+  }
+
   return null;
 }
 
@@ -888,13 +1157,8 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
   });
   const [mapCenter, setMapCenter] = useState<[number, number]>([29.3909, 76.9635]); // Default: Panipat
   const [isLoadingCity, setIsLoadingCity] = useState(true);
-  const [latLongInput, setLatLongInput] = useState(() => {
-    // Check if property has location coordinates
-    const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((property.location || '').trim());
-    return hasCoords ? property.location : '';
-  });
   const [radius, setRadius] = useState(() => {
-    return property.location_accuracy ? parseFloat(property.location_accuracy) || 500 : 500;
+    return property.location_accuracy ? parseFloat(property.location_accuracy) || 0 : 0;
   });
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   // Load saved map view preference from localStorage, default to map view
@@ -902,6 +1166,13 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
     const saved = localStorage.getItem('mapViewPreference');
     return saved === 'satellite';
   });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false); // Track if a search has been attempted
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Initialize map center based on user's default city or property city
   useEffect(() => {
@@ -915,25 +1186,23 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
         const parts = property.location.split(',').map(c => parseFloat(c.trim()));
         if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
           setMapCenter([parts[0], parts[1]]);
+          // selectedPosition is already set in the useState initializer
           setIsLoadingCity(false);
           return;
         }
       }
       
-      // Try to geocode the city
+      // Center map on city but don't select a location by default
+      // User must explicitly click on the map or search for a location
       const coords = await geocodeCity(cityName);
       if (coords) {
         setMapCenter(coords);
-        // Set the selected position to city center if no existing location
-        setSelectedPosition(coords);
-        setLatLongInput(`${coords[0].toFixed(6)},${coords[1].toFixed(6)}`);
       } else {
-        // Fallback to default coordinates (Panipat)
+        // Fallback to default coordinates (Panipat) for map center only
         const defaultCoords: [number, number] = [29.3909, 76.9635];
         setMapCenter(defaultCoords);
-        setSelectedPosition(defaultCoords);
-        setLatLongInput(`${defaultCoords[0].toFixed(6)},${defaultCoords[1].toFixed(6)}`);
       }
+      // Don't set selectedPosition - let user select it explicitly
       setIsLoadingCity(false);
     };
 
@@ -947,34 +1216,138 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
       const parts = property.location.split(',').map(c => parseFloat(c.trim()));
       if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
         setSelectedPosition([parts[0], parts[1]]);
-        setLatLongInput(property.location);
       }
     }
-    setRadius(property.location_accuracy ? parseFloat(property.location_accuracy) || 500 : 500);
+    setRadius(property.location_accuracy ? parseFloat(property.location_accuracy) || 0 : 0);
   }, [property.location, property.location_accuracy]);
+
+  // Handle search input with debouncing
+  useEffect(() => {
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+
+    // If query is too short, clear suggestions
+    if (searchQuery.trim().length < 2) {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      setIsSearching(false);
+      setHasSearched(false);
+      return;
+    }
+
+    // Set loading state
+    setIsSearching(true);
+    setShowSuggestions(false);
+
+    // Debounce the search
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await searchPlaces(searchQuery);
+        console.log('Search results:', results); // Debug log
+        setSearchSuggestions(results);
+        setShowSuggestions(results.length > 0);
+        setHasSearched(true); // Mark that we've completed a search
+      } catch (error) {
+        console.error('Search error in useEffect:', error);
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
+        setHasSearched(true); // Mark that we've completed a search (even if it failed)
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500); // 500ms debounce - increased for better performance
+
+    // Cleanup function
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+    };
+  }, [searchQuery]);
+
+  // Handle search query change
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+  };
+
+  // Handle search submission (when user presses Enter or clicks search)
+  const handleSearchSubmit = async () => {
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    setShowSuggestions(false);
+    try {
+      const coords = await parseLocationInput(searchQuery);
+      if (coords) {
+        setSelectedPosition(coords);
+        setMapCenter(coords);
+        setSearchQuery(''); // Clear search after successful search
+      } else {
+        alert('Location not found. Please try a different search term or enter coordinates directly.');
+      }
+    } catch (error) {
+      console.error('Search submit error:', error);
+      alert('Error searching for location. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle suggestion selection
+  const handleSuggestionSelect = (suggestion: { display_name: string; lat: string; lon: string }) => {
+    const lat = parseFloat(suggestion.lat);
+    const lng = parseFloat(suggestion.lon);
+    setSelectedPosition([lat, lng]);
+    setMapCenter([lat, lng]);
+    setSearchQuery(suggestion.display_name);
+    setShowSuggestions(false);
+  };
+
+  // Handle clicking outside suggestions to close them
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchInputRef.current && !searchInputRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Radius steps: 0, 20, 50, 100, 200, 300, 500, 700, 900, 1100, 1300, 1500, 2000, 5000, 10000, 25000
+  const radiusSteps = [0, 20, 50, 100, 200, 300, 500, 700, 900, 1100, 1300, 1500, 2000, 5000, 10000, 25000];
+  
+  // Find the closest radius step
+  const getClosestRadiusStep = (value: number): number => {
+    return radiusSteps.reduce((prev, curr) => 
+      Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
+    );
+  };
+
+  // Handle radius change with custom steps
+  const handleRadiusChange = (value: number) => {
+    const closestStep = getClosestRadiusStep(value);
+    setRadius(closestStep);
+  };
+
+  // Format radius for display
+  const formatRadius = (value: number): string => {
+    if (value === 0) return '0 m';
+    if (value < 1000) return `${value} m`;
+    return `${(value / 1000).toFixed(1)} km`;
+  };
 
   const handleMapClick = (lat: number, lng: number) => {
     setSelectedPosition([lat, lng]);
-    setLatLongInput(`${lat.toFixed(6)},${lng.toFixed(6)}`);
   };
 
-  const handleInputChange = (value: string) => {
-    setLatLongInput(value);
-    // Try to parse and update marker position
-    const latLongPattern = /^-?\d+\.?\d*,-?\d+\.?\d*$/;
-    if (latLongPattern.test(value.trim())) {
-      const parts = value.split(',').map(c => parseFloat(c.trim()));
-      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-        const lat = parts[0];
-        const lng = parts[1];
-        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-          setSelectedPosition([lat, lng]);
-          // Update map center to show the new position
-          setMapCenter([lat, lng]);
-        }
-      }
-    }
-  };
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -989,7 +1362,6 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setSelectedPosition([lat, lng]);
-        setLatLongInput(`${lat.toFixed(6)},${lng.toFixed(6)}`);
         setMapCenter([lat, lng]);
         setIsGettingLocation(false);
       },
@@ -1021,46 +1393,14 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
   };
 
   const handleSave = () => {
-    const trimmed = latLongInput.trim();
-    if (!trimmed) {
-      alert('Please enter latitude and longitude');
+    if (!selectedPosition) {
+      alert('Please select a location on the map or search for a place');
       return;
     }
 
-    // Validate lat/long format
-    const latLongPattern = /^-?\d+\.?\d*,-?\d+\.?\d*$/;
-    if (!latLongPattern.test(trimmed)) {
-      alert('Please enter valid latitude and longitude in format: lat,long (e.g., 28.7041,77.1025)');
-      return;
-    }
-
-    // Validate lat/long values
-    const parts = trimmed.split(',');
-    const lat = parseFloat(parts[0].trim());
-    const lng = parseFloat(parts[1].trim());
-
-    if (isNaN(lat) || isNaN(lng)) {
-      alert('Please enter valid numeric values for latitude and longitude');
-      return;
-    }
-
-    if (lat < -90 || lat > 90) {
-      alert('Latitude must be between -90 and 90');
-      return;
-    }
-
-    if (lng < -180 || lng > 180) {
-      alert('Longitude must be between -180 and 180');
-      return;
-    }
-
-    onSave(trimmed, radius.toString());
-  };
-
-  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pastedText = e.clipboardData.getData('text');
-    handleInputChange(pastedText.trim());
+    // Use selectedPosition directly to create the location string
+    const locationString = `${selectedPosition[0].toFixed(6)},${selectedPosition[1].toFixed(6)}`;
+    onSave(locationString, radius.toString());
   };
 
   return (
@@ -1079,6 +1419,105 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
         </div>
 
         <div className="p-4 sm:p-6 space-y-6">
+          {/* Search Section - First field above map */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Search Location
+            </label>
+            <div className="relative" ref={searchInputRef}>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSearchSubmit();
+                    }
+                  }}
+                  onPaste={async (e) => {
+                    const pastedText = e.clipboardData.getData('text');
+                    // If it looks like a URL or coordinates, process it immediately
+                    if (pastedText.includes('http') || /^-?\d+\.?\d*,-?\d+\.?\d*$/.test(pastedText.trim())) {
+                      e.preventDefault();
+                      setSearchQuery(pastedText);
+                      // Process immediately without waiting for debounce
+                      setIsSearching(true);
+                      setShowSuggestions(false);
+                      try {
+                        const coords = await parseLocationInput(pastedText);
+                        if (coords) {
+                          setSelectedPosition(coords);
+                          setMapCenter(coords);
+                          setSearchQuery(''); // Clear search after successful search
+                        } else {
+                          // If it's a URL but we couldn't extract coords, try showing it as search
+                          setSearchQuery(pastedText);
+                        }
+                      } catch (error) {
+                        console.error('Paste error:', error);
+                        setSearchQuery(pastedText);
+                      } finally {
+                        setIsSearching(false);
+                      }
+                    }
+                  }}
+                  placeholder="Search for a place, paste coordinates (lat,long), or paste a Google Maps URL"
+                  className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                {isSearching && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
+              {/* Suggestions dropdown */}
+              {showSuggestions && searchSuggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {searchSuggestions.map((suggestion, index) => (
+                    <button
+                      key={`suggestion-${index}-${suggestion.lat}-${suggestion.lon}`}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleSuggestionSelect(suggestion);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none border-b border-gray-100 last:border-b-0 transition-colors"
+                    >
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-gray-700">{suggestion.display_name}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Show message when searching */}
+              {isSearching && searchQuery.trim().length >= 2 && !showSuggestions && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span>Searching...</span>
+                  </div>
+                </div>
+              )}
+              {/* Show message when no results found after search completes */}
+              {!isSearching && hasSearched && searchQuery.trim().length >= 2 && searchSuggestions.length === 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+                  <div className="text-sm text-gray-500 mb-1">No results found for "{searchQuery}"</div>
+                  <div className="text-xs text-gray-400">Try clicking on the map or pasting coordinates directly (e.g., 28.7041,77.1025)</div>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1.5">
+              Search for places, paste coordinates (e.g., 28.7041,77.1025), or paste Google Maps URLs. 
+              If search doesn't work, click on the map to select location directly.
+            </p>
+          </div>
+
           {/* Map Section */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1106,24 +1545,26 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
                     <MapClickHandler onMapClick={handleMapClick} />
                     {selectedPosition && (
                       <>
-                        {/* Location Accuracy Radius Circle */}
-                        <Circle
-                          center={selectedPosition}
-                          radius={radius}
-                          pathOptions={{
-                            color: '#3b82f6',
-                            fillColor: '#3b82f6',
-                            fillOpacity: 0.1,
-                            weight: 2,
-                            opacity: 0.5,
-                          }}
-                        />
+                        {/* Location Accuracy Radius Circle - Only show if radius > 0 */}
+                        {radius > 0 && (
+                          <Circle
+                            center={selectedPosition}
+                            radius={radius}
+                            pathOptions={{
+                              color: '#3b82f6',
+                              fillColor: '#3b82f6',
+                              fillOpacity: 0.1,
+                              weight: 2,
+                              opacity: 0.5,
+                            }}
+                          />
+                        )}
                         <Marker position={selectedPosition}>
                           <Popup>
                             Selected Location<br />
                             {selectedPosition[0].toFixed(6)}, {selectedPosition[1].toFixed(6)}
                             <br />
-                            Accuracy: {radius}m
+                            Accuracy: {formatRadius(radius)}
                           </Popup>
                         </Marker>
                       </>
@@ -1173,49 +1614,39 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
               )}
             </div>
             <p className="text-xs text-gray-500 mt-1.5">
-              Click anywhere on the map to set the location. The map is centered on {user?.default_city || property.city || 'Panipat'}.
-            </p>
-          </div>
-
-          {/* Input Section */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Latitude, Longitude
-            </label>
-            <input
-              type="text"
-              value={latLongInput}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onPaste={handlePaste}
-              placeholder="Paste lat,long here (e.g., 28.7041,77.1025)"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
-            />
-            <p className="text-xs text-gray-500 mt-1.5">
-              Format: latitude,longitude (e.g., 28.7041,77.1025). You can also paste coordinates or use GPS.
+              {selectedPosition ? (
+                <>Selected Location: {selectedPosition[0].toFixed(6)}, {selectedPosition[1].toFixed(6)}</>
+              ) : (
+                <>Click anywhere on the map to set the location. The map is centered on {user?.default_city || property.city || 'Panipat'}.</>
+              )}
             </p>
           </div>
 
           {/* Radius Section */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Location Accuracy Radius: {radius}m
+              Location Accuracy Radius: {formatRadius(radius)}
             </label>
             <input
               type="range"
-              min="100"
-              max="5000"
-              step="100"
+              min="0"
+              max="25000"
+              step="1"
               value={radius}
-              onChange={(e) => setRadius(parseInt(e.target.value))}
+              onChange={(e) => handleRadiusChange(parseInt(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>100m</span>
-              <span>2500m</span>
-              <span>5000m</span>
+            <div className="flex justify-between text-xs text-gray-500 mt-1 flex-wrap gap-1">
+              <span>0 m</span>
+              <span>100 m</span>
+              <span>500 m</span>
+              <span>1.5 km</span>
+              <span>2 km</span>
+              <span>10 km</span>
+              <span>25 km</span>
             </div>
             <p className="text-xs text-gray-500 mt-1.5">
-              This radius indicates the accuracy of the location. A smaller radius means more precise location.
+              This radius indicates the accuracy of the location. A smaller radius means more precise location. Steps: 0, 20, 50, 100, 200, 300, 500, 700, 900, 1100, 1300, 1500, 2 km, 5 km, 10 km, 25 km
             </p>
           </div>
 
