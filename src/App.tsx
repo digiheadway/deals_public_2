@@ -784,6 +784,7 @@ function App() {
             handleUpdateLandmarkLocation={handleUpdateLandmarkLocation}
             handleClearSearchAndFilters={handleClearSearchAndFilters}
             showToast={showToast}
+            searchFilterKey={searchFilterKey}
           />
         ) : (
           <Suspense fallback={
@@ -851,6 +852,7 @@ function App() {
             handleUpdateLandmarkLocation={handleUpdateLandmarkLocation}
             handleClearSearchAndFilters={handleClearSearchAndFilters}
             showToast={showToast}
+            searchFilterKey={searchFilterKey}
           />
         ) : (
           <Suspense fallback={
@@ -918,6 +920,7 @@ function App() {
             handleUpdateLandmarkLocation={handleUpdateLandmarkLocation}
             handleClearSearchAndFilters={handleClearSearchAndFilters}
             showToast={showToast}
+            searchFilterKey={searchFilterKey}
           />
         ) : (
           <Suspense fallback={
@@ -1021,6 +1024,7 @@ interface MainAppContentProps {
   handleUpdateLandmarkLocation: (id: number, landmarkLocation: string, landmarkLocationDistance: string) => Promise<void>;
   handleClearSearchAndFilters: () => void;
   showToast: (message: string, type: 'success' | 'error') => void;
+  searchFilterKey: number;
 }
 
 function MainAppContent({
@@ -1069,6 +1073,7 @@ function MainAppContent({
   handleUpdateLandmarkLocation,
   handleClearSearchAndFilters,
   showToast,
+  searchFilterKey,
 }: MainAppContentProps) {
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   
