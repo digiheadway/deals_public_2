@@ -1,19 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Home, Globe, ChevronDown, User, MapPin, List } from 'lucide-react';
 import { PropertyCard } from './components/PropertyCard';
 import { PropertyCardSkeleton } from './components/PropertyCardSkeleton';
-import { PropertyModal } from './components/PropertyModal';
-import { PropertyDetailsModal } from './components/PropertyDetailsModal';
-import { ContactModal } from './components/ContactModal';
 import { SearchFilter } from './components/SearchFilter';
-import { ProfilePage } from './components/ProfilePage';
-import { HomePage } from './components/HomePage';
-import { AuthPage } from './components/AuthPage';
-import { PublicPropertyPage } from './components/PublicPropertyPage';
 import { Toast } from './components/Toast';
 import { InstallPromptCard } from './components/InstallPrompt';
-import { PropertyMap } from './components/PropertyMap';
 import { useAuth } from './contexts/AuthContext';
 import { propertyApi } from './services/api';
 import { Property, PropertyFormData, FilterOptions } from './types/property';
@@ -21,6 +13,16 @@ import { logoutUser, getCurrentUser } from './types/user';
 import { authApi } from './services/authApi';
 import { STORAGE_KEYS } from './utils/filterOptions';
 import { formatPriceWithLabel } from './utils/priceFormatter';
+
+// Lazy load heavy components
+const PropertyModal = lazy(() => import('./components/PropertyModal').then(m => ({ default: m.PropertyModal })));
+const PropertyDetailsModal = lazy(() => import('./components/PropertyDetailsModal').then(m => ({ default: m.PropertyDetailsModal })));
+const ContactModal = lazy(() => import('./components/ContactModal').then(m => ({ default: m.ContactModal })));
+const ProfilePage = lazy(() => import('./components/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const HomePage = lazy(() => import('./components/HomePage').then(m => ({ default: m.HomePage })));
+const AuthPage = lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
+const PublicPropertyPage = lazy(() => import('./components/PublicPropertyPage').then(m => ({ default: m.PublicPropertyPage })));
+const PropertyMap = lazy(() => import('./components/PropertyMap').then(m => ({ default: m.PropertyMap })));
 
 type FilterType = 'all' | 'my' | 'public';
 
@@ -649,13 +651,13 @@ function App() {
     setShowDetailsModal(true);
   };
 
-  // Show loading state while auth is being checked
+  // Show minimal loading state while auth is being checked
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <p className="text-sm text-gray-600">Loading...</p>
         </div>
       </div>
     );
@@ -664,33 +666,53 @@ function App() {
   return (
     <Routes>
       {/* Public Property Page - Always accessible */}
-      <Route path="/property/:id" element={<PublicPropertyPage />} />
+      <Route path="/property/:id" element={
+        <Suspense fallback={
+          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+              <p className="text-sm text-gray-600">Loading...</p>
+            </div>
+          </div>
+        }>
+          <PublicPropertyPage />
+        </Suspense>
+      } />
       
       {/* Landing Page */}
       <Route path="/" element={
         showLandingPage || !isAuthenticated ? (
-          <HomePage 
-            onGetStarted={handleGetStarted}
-            isAuthenticated={isAuthenticated}
-            onGoToLogin={() => {
-              authApi.logout();
-              logoutUser();
-              setUser(null);
-              setShowLandingPage(false);
-              navigate('/login');
-            }}
-            onGoToApp={() => {
-              try {
-                localStorage.setItem('has_visited_app', 'true');
-              } catch {}
-              setShowLandingPage(false);
-              if (isAuthenticated) {
-                navigate('/home');
-              } else {
+          <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-sm text-gray-600">Loading...</p>
+              </div>
+            </div>
+          }>
+            <HomePage 
+              onGetStarted={handleGetStarted}
+              isAuthenticated={isAuthenticated}
+              onGoToLogin={() => {
+                authApi.logout();
+                logoutUser();
+                setUser(null);
+                setShowLandingPage(false);
                 navigate('/login');
-              }
-            }}
-          />
+              }}
+              onGoToApp={() => {
+                try {
+                  localStorage.setItem('has_visited_app', 'true');
+                } catch {}
+                setShowLandingPage(false);
+                if (isAuthenticated) {
+                  navigate('/home');
+                } else {
+                  navigate('/login');
+                }
+              }}
+            />
+          </Suspense>
         ) : isAuthenticated ? (
           <MainAppContent
             ownerId={ownerId}
@@ -739,10 +761,19 @@ function App() {
             showToast={showToast}
           />
         ) : (
-          <AuthPage 
-            onLogin={handleLogin}
-            onGoToHome={() => navigate('/')}
-          />
+          <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-sm text-gray-600">Loading...</p>
+              </div>
+            </div>
+          }>
+            <AuthPage 
+              onLogin={handleLogin}
+              onGoToHome={() => navigate('/')}
+            />
+          </Suspense>
         )
       } />
       
@@ -796,10 +827,19 @@ function App() {
             showToast={showToast}
           />
         ) : (
-          <AuthPage 
-            onLogin={handleLogin}
-            onGoToHome={() => navigate('/')}
-          />
+          <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-sm text-gray-600">Loading...</p>
+              </div>
+            </div>
+          }>
+            <AuthPage 
+              onLogin={handleLogin}
+              onGoToHome={() => navigate('/')}
+            />
+          </Suspense>
         )
       } />
       
@@ -853,27 +893,54 @@ function App() {
             showToast={showToast}
           />
         ) : (
-          <AuthPage 
-            onLogin={handleLogin}
-            onGoToHome={() => navigate('/')}
-          />
+          <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-sm text-gray-600">Loading...</p>
+              </div>
+            </div>
+          }>
+            <AuthPage 
+              onLogin={handleLogin}
+              onGoToHome={() => navigate('/')}
+            />
+          </Suspense>
         )
       } />
       <Route path="/profile" element={
         isAuthenticated ? (
-          <ProfilePage 
-            onBack={() => navigate('/home')}
-            onLogout={() => {
-              handleLogout();
-              showToast('Logged out', 'success');
-              navigate('/login');
-            }}
-          />
+          <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-sm text-gray-600">Loading...</p>
+              </div>
+            </div>
+          }>
+            <ProfilePage 
+              onBack={() => navigate('/home')}
+              onLogout={() => {
+                handleLogout();
+                showToast('Logged out', 'success');
+                navigate('/login');
+              }}
+            />
+          </Suspense>
         ) : (
-          <AuthPage 
-            onLogin={handleLogin}
-            onGoToHome={() => navigate('/')}
-          />
+          <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-sm text-gray-600">Loading...</p>
+              </div>
+            </div>
+          }>
+            <AuthPage 
+              onLogin={handleLogin}
+              onGoToHome={() => navigate('/')}
+            />
+          </Suspense>
         )
       } />
     </Routes>
@@ -1137,11 +1204,20 @@ function MainAppContent({
                   </p>
                 </div>
               ) : (
-                <PropertyMap 
-                  properties={currentProperties} 
-                  center={getMapCenter()}
-                  onMarkerClick={handleViewProperty}
-                />
+                <Suspense fallback={
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                      <p className="text-sm text-gray-600">Loading map...</p>
+                    </div>
+                  </div>
+                }>
+                  <PropertyMap 
+                    properties={currentProperties} 
+                    center={getMapCenter()}
+                    onMarkerClick={handleViewProperty}
+                  />
+                </Suspense>
               )}
             </div>
           ) : (
@@ -1169,50 +1245,77 @@ function MainAppContent({
       </div>
 
       {showModal && (
-        <PropertyModal
-          property={editingProperty}
-          onClose={() => {
-            setShowModal(false);
-            setEditingProperty(null);
-          }}
-          onSubmit={editingProperty ? handleEditProperty : handleAddProperty}
-        />
+        <Suspense fallback={
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+              <p className="text-sm text-white">Loading...</p>
+            </div>
+          </div>
+        }>
+          <PropertyModal
+            property={editingProperty}
+            onClose={() => {
+              setShowModal(false);
+              setEditingProperty(null);
+            }}
+            onSubmit={editingProperty ? handleEditProperty : handleAddProperty}
+          />
+        </Suspense>
       )}
 
       {showDetailsModal && selectedProperty && (
-        <PropertyDetailsModal
-          property={selectedProperty}
-          isOwned={selectedProperty.owner_id === ownerId}
-          onClose={() => {
-            setShowDetailsModal(false);
-            setSelectedProperty(null);
-          }}
-          onEdit={(p) => {
-            setEditingProperty(p);
-            setShowDetailsModal(false);
-            setShowModal(true);
-          }}
-          onDelete={handleDeleteProperty}
-          onTogglePublic={handleTogglePublic}
-          onShare={handleShare}
-          onAskQuestion={handleAskQuestion}
-          onUpdateHighlightsAndTags={handleUpdateHighlightsAndTags}
-          onUpdateLocation={handleUpdateLocation}
-          onUpdateLandmarkLocation={handleUpdateLandmarkLocation}
-        />
+        <Suspense fallback={
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+              <p className="text-sm text-white">Loading...</p>
+            </div>
+          </div>
+        }>
+          <PropertyDetailsModal
+            property={selectedProperty}
+            isOwned={selectedProperty.owner_id === ownerId}
+            onClose={() => {
+              setShowDetailsModal(false);
+              setSelectedProperty(null);
+            }}
+            onEdit={(p) => {
+              setEditingProperty(p);
+              setShowDetailsModal(false);
+              setShowModal(true);
+            }}
+            onDelete={handleDeleteProperty}
+            onTogglePublic={handleTogglePublic}
+            onShare={handleShare}
+            onAskQuestion={handleAskQuestion}
+            onUpdateHighlightsAndTags={handleUpdateHighlightsAndTags}
+            onUpdateLocation={handleUpdateLocation}
+            onUpdateLandmarkLocation={handleUpdateLandmarkLocation}
+          />
+        </Suspense>
       )}
 
       {showContactModal && selectedProperty && (
-        <ContactModal
-          property={selectedProperty}
-          ownerPhone="919710858000"
-          senderId={ownerId}
-          onClose={() => {
-            setShowContactModal(false);
-            setSelectedProperty(null);
-          }}
-          onSubmit={handleContactSubmit}
-        />
+        <Suspense fallback={
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+              <p className="text-sm text-white">Loading...</p>
+            </div>
+          </div>
+        }>
+          <ContactModal
+            property={selectedProperty}
+            ownerPhone="919710858000"
+            senderId={ownerId}
+            onClose={() => {
+              setShowContactModal(false);
+              setSelectedProperty(null);
+            }}
+            onSubmit={handleContactSubmit}
+          />
+        </Suspense>
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

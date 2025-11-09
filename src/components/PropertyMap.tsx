@@ -3,8 +3,20 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-le
 import { Property } from '../types/property';
 import { formatPrice } from '../utils/priceFormatter';
 import { Navigation, Satellite } from 'lucide-react';
-import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+
+// Dynamically load Leaflet CSS only when this component is used
+let leafletCssLoaded = false;
+const loadLeafletCss = () => {
+  if (leafletCssLoaded) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+  link.crossOrigin = '';
+  document.head.appendChild(link);
+  leafletCssLoaded = true;
+};
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -47,6 +59,11 @@ function TileLayerSwitcher({ isSatelliteView }: { isSatelliteView: boolean }) {
 }
 
 export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerClick }: PropertyMapProps) {
+  // Load Leaflet CSS when component mounts
+  useEffect(() => {
+    loadLeafletCss();
+  }, []);
+
   // Load saved map view preference from localStorage, default to map view
   const [isSatelliteView, setIsSatelliteView] = useState(() => {
     const saved = localStorage.getItem('mapViewPreference');

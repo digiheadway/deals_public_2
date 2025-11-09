@@ -23,16 +23,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return currentUser?.id || 0;
   });
 
-  const [loading, setLoading] = useState(true);
+  // Start with false to allow immediate render, verify in background
+  const [loading, setLoading] = useState(false);
 
-  // Check for existing token and fetch user profile on mount
+  // Check for existing token and fetch user profile on mount (non-blocking)
   useEffect(() => {
     const checkAuth = async () => {
       const token = getStoredToken();
       const storedUser = getCurrentUser();
       
+      // Set initial state immediately from localStorage (non-blocking)
+      if (storedUser) {
+        setUserState(storedUser);
+        setOwnerIdState(storedUser.id);
+      }
+      
+      // Verify token in background if we have one
       if (token && storedUser) {
-        // Verify token is still valid by fetching profile
+        // Verify token is still valid by fetching profile (non-blocking)
         try {
           const response = await authApi.getProfile();
           if (response.status && response.user) {
@@ -65,23 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           console.error('Failed to verify token:', error);
           // On error, keep stored user but mark as potentially stale
-          if (storedUser) {
-            setUserState(storedUser);
-            setOwnerIdState(storedUser.id);
-          } else {
-            setOwnerIdState(0);
-          }
+          // Already set from localStorage above, so no need to update
         }
-      } else if (storedUser) {
-        // No token but have stored user (legacy)
-        setUserState(storedUser);
-        setOwnerIdState(storedUser.id);
-      } else {
+      } else if (!storedUser) {
         // No token and no stored user - clear ownerId
         setOwnerIdState(0);
       }
-      
-      setLoading(false);
     };
 
     checkAuth();
