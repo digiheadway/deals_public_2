@@ -13,6 +13,8 @@ export interface Property {
   price_max: number;
   location: string;
   location_accuracy?: string;
+  landmark_location?: string;
+  landmark_location_distance?: string;
   is_public: number;
   public_rating?: number;
   my_rating?: number;
@@ -35,6 +37,8 @@ export interface PropertyFormData {
   price_max: number;
   location: string;
   location_accuracy?: string;
+  landmark_location?: string;
+  landmark_location_distance?: string;
   is_public: number;
   tags?: string;
   highlights?: string;

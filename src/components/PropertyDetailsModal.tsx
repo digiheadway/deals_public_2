@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Copy, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapPin, FileText, Sparkles, Tag, Lock, Globe, ChevronDown, Star, Building, CornerDownRight, Navigation, Shield, Wifi, Calendar, AlertCircle, TreePine, Home, TrendingUp, DollarSign, Info, Satellite, Map as MapIcon, Search } from 'lucide-react';
 import { Property } from '../types/property';
 import { formatPrice, formatPriceWithLabel } from '../utils/priceFormatter';
 import { HIGHLIGHT_OPTIONS, TAG_OPTIONS } from '../utils/filterOptions';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,6 +29,7 @@ interface PropertyDetailsModalProps {
   onAskQuestion?: (property: Property) => void;
   onUpdateHighlightsAndTags?: (id: number, highlights: string, tags: string) => void;
   onUpdateLocation?: (id: number, location: string, locationAccuracy: string) => void;
+  onUpdateLandmarkLocation?: (id: number, landmarkLocation: string, landmarkLocationDistance: string) => void;
 }
 
 // Map highlight text to icons
@@ -103,6 +104,7 @@ export function PropertyDetailsModal({
   onAskQuestion,
   onUpdateHighlightsAndTags,
   onUpdateLocation,
+  onUpdateLandmarkLocation,
 }: PropertyDetailsModalProps) {
   const highlightStyles = getHighlightStyles(property.type);
   const [copied, setCopied] = useState(false);
@@ -112,7 +114,6 @@ export function PropertyDetailsModal({
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showLocationViewModal, setShowLocationViewModal] = useState(false);
   const [showNoteTooltip, setShowNoteTooltip] = useState(false);
-  const [showLocationLockTooltip, setShowLocationLockTooltip] = useState(false);
   const [showPrivacyInfoTooltip, setShowPrivacyInfoTooltip] = useState(false);
   const [selectedHighlights, setSelectedHighlights] = useState<string[]>(
     property.highlights ? property.highlights.split(',').map(h => h.trim()).filter(Boolean) : []
@@ -134,12 +135,6 @@ export function PropertyDetailsModal({
   const locationCoords = parseLocation(property.location);
   const hasLocation = hasLocationCoordinates(property.location);
 
-  // Open location in map modal
-  const handleOpenInMap = () => {
-    if (!locationCoords) return;
-    setShowLocationViewModal(true);
-  };
-
   // Open location in Google Maps
   const handleOpenInGoogleMaps = () => {
     if (!locationCoords) return;
@@ -157,6 +152,7 @@ export function PropertyDetailsModal({
     setCopiedLocation(true);
     setTimeout(() => setCopiedLocation(false), 2000);
   };
+
 
   // Update local state when property changes
   useEffect(() => {
@@ -282,32 +278,20 @@ export function PropertyDetailsModal({
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-gray-500" />
                 <span className="text-sm sm:text-base text-gray-600" >Location</span>
-                <div className="relative">
-                  <button
-                    onMouseEnter={() => setShowLocationLockTooltip(true)}
-                    onMouseLeave={() => setShowLocationLockTooltip(false)}
-                    onClick={() => setShowLocationLockTooltip(!showLocationLockTooltip)}
-                    className="p-0.5 hover:bg-gray-100 rounded transition-colors"
-                  >
-                    <Lock className="w-3.5 h-3.5 text-gray-400" />
-                  </button>
-                  {showLocationLockTooltip && (
-                    <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded z-50 pointer-events-none min-w-[200px] sm:min-w-[250px] max-w-[280px] sm:max-w-[320px]">
-                      Location is only visible to you. Others cannot see the exact coordinates.
-                      <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-gray-900"></div>
-                    </div>
-                  )}
-                </div>
               </div>
               <div className="text-right flex items-center gap-2 flex-wrap justify-end">
                 {hasLocation ? (
                   <>
                     <button
-                      onClick={handleOpenInMap}
+                      onClick={() => {
+                        if (locationCoords) {
+                          setShowLocationViewModal(true);
+                        }
+                      }}
                       className="text-sm sm:text-base font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
                     >
                       <Navigation className="w-4 h-4" />
-                      Open {property.location_accuracy && `(${property.location_accuracy}m)`}
+                      Open
                     </button>
                     {isOwned && (
                       <button
@@ -776,9 +760,13 @@ export function PropertyDetailsModal({
         <LocationModal
           property={property}
           onClose={() => setShowLocationModal(false)}
-          onSave={(location, locationAccuracy) => {
+          onSave={(location, locationAccuracy, landmarkLocation, landmarkDistance) => {
             if (onUpdateLocation) {
               onUpdateLocation(property.id, location, locationAccuracy);
+            }
+            // If landmark location is provided, also save it
+            if (landmarkLocation && landmarkDistance && onUpdateLandmarkLocation) {
+              onUpdateLandmarkLocation(property.id, landmarkLocation, landmarkDistance);
             }
             setShowLocationModal(false);
           }}
@@ -793,6 +781,7 @@ export function PropertyDetailsModal({
           onOpenInGoogleMaps={handleOpenInGoogleMaps}
         />
       )}
+
     </div>
   );
 }
@@ -801,7 +790,7 @@ export function PropertyDetailsModal({
 interface LocationModalProps {
   property: Property;
   onClose: () => void;
-  onSave: (location: string, locationAccuracy: string) => void;
+  onSave: (location: string, locationAccuracy: string, landmarkLocation?: string, landmarkDistance?: string) => void;
 }
 
 // Component to handle map clicks
@@ -963,11 +952,11 @@ async function searchPlaces(query: string): Promise<Array<{ display_name: string
   }
 }
 
-// Extract coordinates from various URL formats
+// Extract coordinates from various URL formats (synchronous, no API calls)
 function extractCoordsFromUrl(url: string): [number, number] | null {
   try {
     // Try to extract from Google Maps long URL patterns
-    // Pattern 1: @lat,lng or @lat,lng,z
+    // Pattern 1: @lat,lng or @lat,lng,z (most common Google Maps format)
     const atPattern = /@(-?\d+\.?\d*),(-?\d+\.?\d*)/;
     const atMatch = url.match(atPattern);
     if (atMatch) {
@@ -978,7 +967,18 @@ function extractCoordsFromUrl(url: string): [number, number] | null {
       }
     }
 
-    // Pattern 2: ?q=lat,lng or ?q=lat+lng
+    // Pattern 2: /@lat,lng,z format (alternative Google Maps format)
+    const slashAtPattern = /\/@(-?\d+\.?\d*),(-?\d+\.?\d*)/;
+    const slashAtMatch = url.match(slashAtPattern);
+    if (slashAtMatch) {
+      const lat = parseFloat(slashAtMatch[1]);
+      const lng = parseFloat(slashAtMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return [lat, lng];
+      }
+    }
+
+    // Pattern 3: ?q=lat,lng or ?q=lat+lng
     const qPattern = /[?&]q=(-?\d+\.?\d*)[,+](-?\d+\.?\d*)/;
     const qMatch = url.match(qPattern);
     if (qMatch) {
@@ -989,7 +989,7 @@ function extractCoordsFromUrl(url: string): [number, number] | null {
       }
     }
 
-    // Pattern 3: ll=lat,lng
+    // Pattern 4: ll=lat,lng
     const llPattern = /[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/;
     const llMatch = url.match(llPattern);
     if (llMatch) {
@@ -1000,7 +1000,7 @@ function extractCoordsFromUrl(url: string): [number, number] | null {
       }
     }
 
-    // Pattern 4: center=lat,lng
+    // Pattern 5: center=lat,lng
     const centerPattern = /[?&]center=(-?\d+\.?\d*),(-?\d+\.?\d*)/;
     const centerMatch = url.match(centerPattern);
     if (centerMatch) {
@@ -1011,12 +1011,34 @@ function extractCoordsFromUrl(url: string): [number, number] | null {
       }
     }
 
-    // Pattern 5: /@lat,lng or /lat,lng
+    // Pattern 6: /place/.../@lat,lng format
+    const placePattern = /\/place\/[^/]+\/@(-?\d+\.?\d*),(-?\d+\.?\d*)/;
+    const placeMatch = url.match(placePattern);
+    if (placeMatch) {
+      const lat = parseFloat(placeMatch[1]);
+      const lng = parseFloat(placeMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return [lat, lng];
+      }
+    }
+
+    // Pattern 7: /@lat,lng or /lat,lng (fallback)
     const slashPattern = /\/([-]?\d+\.?\d*),([-]?\d+\.?\d*)/;
     const slashMatch = url.match(slashPattern);
     if (slashMatch) {
       const lat = parseFloat(slashMatch[1]);
       const lng = parseFloat(slashMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return [lat, lng];
+      }
+    }
+
+    // Pattern 8: data=lat,lng (for embedded maps)
+    const dataPattern = /data=(-?\d+\.?\d*),(-?\d+\.?\d*)/;
+    const dataMatch = url.match(dataPattern);
+    if (dataMatch) {
+      const lat = parseFloat(dataMatch[1]);
+      const lng = parseFloat(dataMatch[2]);
       if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
         return [lat, lng];
       }
@@ -1028,49 +1050,51 @@ function extractCoordsFromUrl(url: string): [number, number] | null {
 }
 
 // Resolve short Google Maps URL and extract coordinates
-async function resolveGoogleMapsUrl(shortUrl: string): Promise<[number, number] | null> {
+// Returns both coordinates and the final URL for display
+async function resolveGoogleMapsUrl(shortUrl: string): Promise<{ coords: [number, number]; finalUrl?: string } | null> {
   try {
     // First, try to extract coordinates directly from URL (works for long URLs)
     const directCoords = extractCoordsFromUrl(shortUrl);
     if (directCoords) {
-      return directCoords;
+      return { coords: directCoords, finalUrl: shortUrl };
     }
 
     // For short URLs (maps.app.goo.gl or goo.gl), we need to resolve them
-    // However, due to CORS, we can't easily do this from the browser
-    // We'll try using a CORS proxy, but this may not always work
+    // Use browser's built-in redirect following to get the final URL with coordinates
     try {
-      // Try to fetch with redirect following
-      // Some browsers will follow redirects and give us the final URL
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for redirects
       
+      // Use GET with redirect: 'follow' to let browser follow all redirects
+      // The browser will automatically follow 2-3 redirects for short URLs
       const response = await fetch(shortUrl, {
         method: 'GET',
-        redirect: 'follow',
+        redirect: 'follow', // Browser will follow all redirects automatically
         signal: controller.signal,
       });
       
       clearTimeout(timeoutId);
       
-      // Try to extract from the final URL
+      // The browser will have followed all redirects, so response.url contains the final URL
       const finalUrl = response.url || shortUrl;
+      
+      // Try to extract coordinates from the final URL
       const urlCoords = extractCoordsFromUrl(finalUrl);
       if (urlCoords) {
-        return urlCoords;
+        return { coords: urlCoords, finalUrl };
       }
 
-      // If URL doesn't have coordinates, try to extract from HTML
+      // If URL doesn't have coordinates in the URL itself, try to extract from HTML
       // This works if the server allows it (may be blocked by CORS)
       try {
         const html = await response.text();
         const htmlCoords = extractCoordsFromUrl(html);
         if (htmlCoords) {
-          return htmlCoords;
+          return { coords: htmlCoords, finalUrl };
         }
       } catch (htmlError) {
-        // Can't read HTML, that's okay
-        console.log('Could not read HTML response');
+        // Can't read HTML due to CORS, that's okay
+        console.log('Could not read HTML response due to CORS');
       }
     } catch (fetchError: any) {
       // CORS or network error - this is expected for cross-origin requests
@@ -1087,48 +1111,59 @@ async function resolveGoogleMapsUrl(shortUrl: string): Promise<[number, number] 
 }
 
 // Parse input to determine if it's a URL, lat/long, or search query
-async function parseLocationInput(input: string): Promise<[number, number] | null> {
+// Returns coordinates and a formatted string to display in the input
+async function parseLocationInput(input: string): Promise<{ coords: [number, number]; displayText?: string } | null> {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  // Check if it's a lat/long pair
-  const latLongPattern = /^-?\d+\.?\d*,-?\d+\.?\d*$/;
-  if (latLongPattern.test(trimmed)) {
-    const parts = trimmed.split(',').map(c => parseFloat(c.trim()));
-    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-      const lat = parts[0];
-      const lng = parts[1];
-      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-        return [lat, lng];
-      }
+  // STEP 1: Check if it's a direct lat/long pair (instant, no API call)
+  // Improved pattern to handle: "28.7041, 77.1025", "28.7041,77.1025", "-28.7041, 77.1025", etc.
+  const latLongPattern = /^\s*(-?\d+\.?\d*)\s*[,，]\s*(-?\d+\.?\d*)\s*$/;
+  const latLongMatch = trimmed.match(latLongPattern);
+  if (latLongMatch) {
+    const lat = parseFloat(latLongMatch[1]);
+    const lng = parseFloat(latLongMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      // Format coordinates for display
+      const displayText = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+      return { coords: [lat, lng], displayText }; // Instant return, no API call
     }
   }
 
-  // Check if it's a URL
+  // STEP 2: Try to extract coordinates from URL synchronously (no API call)
+  // This works for most Google Maps URLs and other map URLs that contain coordinates
+  const urlCoords = extractCoordsFromUrl(trimmed);
+  if (urlCoords) {
+    // Format coordinates for display
+    const displayText = `${urlCoords[0].toFixed(6)},${urlCoords[1].toFixed(6)}`;
+    return { coords: urlCoords, displayText }; // Instant return, no API call
+  }
+
+  // STEP 3: Check if it's a valid URL format (but coordinates weren't found)
   try {
     const url = new URL(trimmed);
-    // Check if it's a Google Maps URL
+    
+    // For Google Maps short URLs (maps.app.goo.gl, goo.gl), try to resolve them
+    // Only do this if we couldn't extract coordinates directly
     if (url.hostname.includes('google.com') || url.hostname.includes('maps.app.goo.gl') || url.hostname.includes('goo.gl')) {
-      const coords = await resolveGoogleMapsUrl(trimmed);
-      if (coords) {
-        return coords;
-      }
-    } else {
-      // Try to extract coordinates from any URL
-      const coords = extractCoordsFromUrl(trimmed);
-      if (coords) {
-        return coords;
+      const result = await resolveGoogleMapsUrl(trimmed);
+      if (result) {
+        // Format coordinates for display
+        const displayText = `${result.coords[0].toFixed(6)},${result.coords[1].toFixed(6)}`;
+        return { coords: result.coords, displayText };
       }
     }
   } catch (e) {
-    // Not a valid URL, treat as search query
+    // Not a valid URL format, will treat as search query
   }
 
-  // If it's not a URL or coordinates, treat as search query and geocode it
+  // STEP 4: If it's not coordinates or a URL with coordinates, treat as search query
+  // Only make API call here if we haven't found coordinates yet
   const searchResults = await searchPlaces(trimmed);
   if (searchResults && searchResults.length > 0) {
     const firstResult = searchResults[0];
-    return [parseFloat(firstResult.lat), parseFloat(firstResult.lon)];
+    const coords: [number, number] = [parseFloat(firstResult.lat), parseFloat(firstResult.lon)];
+    return { coords, displayText: firstResult.display_name };
   }
 
   return null;
@@ -1136,6 +1171,11 @@ async function parseLocationInput(input: string): Promise<[number, number] | nul
 
 function LocationModal({ property, onClose, onSave }: LocationModalProps) {
   const { user } = useAuth();
+  
+  // Get location and landmark location fields
+  const locationField = property.location;
+  const landmarkLocationField = property.landmark_location;
+  const accuracyField = property.location_accuracy;
   
   // Lock body scroll when modal is open (nested modal, so this increments the counter)
   useEffect(() => {
@@ -1146,9 +1186,20 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
   }, []);
   const [selectedPosition, setSelectedPosition] = useState<[number, number] | null>(() => {
     // Check if property has location coordinates
-    const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((property.location || '').trim());
+    const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((locationField || '').trim());
     if (hasCoords) {
-      const parts = property.location.split(',').map(c => parseFloat(c.trim()));
+      const parts = locationField!.split(',').map(c => parseFloat(c.trim()));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        return [parts[0], parts[1]];
+      }
+    }
+    return null;
+  });
+  const [landmarkPosition, setLandmarkPosition] = useState<[number, number] | null>(() => {
+    // Check if property has landmark location coordinates
+    const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((landmarkLocationField || '').trim());
+    if (hasCoords) {
+      const parts = landmarkLocationField!.split(',').map(c => parseFloat(c.trim()));
       if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
         return [parts[0], parts[1]];
       }
@@ -1158,7 +1209,7 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
   const [mapCenter, setMapCenter] = useState<[number, number]>([29.3909, 76.9635]); // Default: Panipat
   const [isLoadingCity, setIsLoadingCity] = useState(true);
   const [radius, setRadius] = useState(() => {
-    return property.location_accuracy ? parseFloat(property.location_accuracy) || 0 : 0;
+    return accuracyField ? parseFloat(accuracyField) || 0 : 0;
   });
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   // Load saved map view preference from localStorage, default to map view
@@ -1173,6 +1224,18 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
   const [hasSearched, setHasSearched] = useState(false); // Track if a search has been attempted
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  
+  // Landmark location state - checkbox checked by default
+  const [addLandmark, setAddLandmark] = useState(true);
+  // Generate random distance between 150-350 meters (generated once per modal open)
+  const landmarkDistance = useMemo(() => {
+    return Math.floor(Math.random() * (350 - 150 + 1)) + 150;
+  }, []);
+  // Generate random direction (generated once per modal open)
+  const landmarkDirection = useMemo(() => {
+    const directions = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
+    return directions[Math.floor(Math.random() * directions.length)];
+  }, []);
 
   // Initialize map center based on user's default city or property city
   useEffect(() => {
@@ -1181,9 +1244,9 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
       const cityName = user?.default_city || property.city || 'Panipat';
       
       // Check if property already has location
-      const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((property.location || '').trim());
+      const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((locationField || '').trim());
       if (hasCoords) {
-        const parts = property.location.split(',').map(c => parseFloat(c.trim()));
+        const parts = locationField!.split(',').map(c => parseFloat(c.trim()));
         if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
           setMapCenter([parts[0], parts[1]]);
           // selectedPosition is already set in the useState initializer
@@ -1207,19 +1270,55 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
     };
 
     initializeMapCenter();
-  }, [user?.default_city, property.city, property.location]); // Run when user or property changes
+  }, [user?.default_city, property.city, locationField]); // Run when user or property changes
 
   // Update state when property changes
   useEffect(() => {
-    const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((property.location || '').trim());
+    const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((locationField || '').trim());
     if (hasCoords) {
-      const parts = property.location.split(',').map(c => parseFloat(c.trim()));
+      const parts = locationField!.split(',').map(c => parseFloat(c.trim()));
       if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
         setSelectedPosition([parts[0], parts[1]]);
       }
     }
-    setRadius(property.location_accuracy ? parseFloat(property.location_accuracy) || 0 : 0);
-  }, [property.location, property.location_accuracy]);
+    const hasLandmarkCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((landmarkLocationField || '').trim());
+    if (hasLandmarkCoords) {
+      const parts = landmarkLocationField!.split(',').map(c => parseFloat(c.trim()));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        setLandmarkPosition([parts[0], parts[1]]);
+        setAddLandmark(true);
+      }
+    }
+    setRadius(accuracyField ? parseFloat(accuracyField) || 0 : 0);
+  }, [locationField, landmarkLocationField, accuracyField]);
+
+  // Auto-generate landmark position when location is selected and checkbox is checked
+  useEffect(() => {
+    if (selectedPosition && addLandmark && !landmarkPosition) {
+      // Calculate landmark location
+      const R = 6371000;
+      const directionToBearing: Record<string, number> = {
+        'north': 0, 'northeast': 45, 'east': 90, 'southeast': 135,
+        'south': 180, 'southwest': 225, 'west': 270, 'northwest': 315,
+      };
+      const bearing = (directionToBearing[landmarkDirection] || 0) * (Math.PI / 180);
+      const latRad = selectedPosition[0] * (Math.PI / 180);
+      const lngRad = selectedPosition[1] * (Math.PI / 180);
+      const newLatRad = Math.asin(
+        Math.sin(latRad) * Math.cos(landmarkDistance / R) +
+        Math.cos(latRad) * Math.sin(landmarkDistance / R) * Math.cos(bearing)
+      );
+      const newLngRad = lngRad + Math.atan2(
+        Math.sin(bearing) * Math.sin(landmarkDistance / R) * Math.cos(latRad),
+        Math.cos(landmarkDistance / R) - Math.sin(latRad) * Math.sin(newLatRad)
+      );
+      const landmarkLat = newLatRad * (180 / Math.PI);
+      const landmarkLng = newLngRad * (180 / Math.PI);
+      setLandmarkPosition([landmarkLat, landmarkLng]);
+    } else if (!addLandmark) {
+      setLandmarkPosition(null);
+    }
+  }, [selectedPosition, addLandmark, landmarkDistance, landmarkDirection]);
 
   // Handle search input with debouncing
   useEffect(() => {
@@ -1229,8 +1328,10 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
       searchTimeoutRef.current = null;
     }
 
+    const trimmed = searchQuery.trim();
+    
     // If query is too short, clear suggestions
-    if (searchQuery.trim().length < 2) {
+    if (trimmed.length < 2) {
       setSearchSuggestions([]);
       setShowSuggestions(false);
       setIsSearching(false);
@@ -1238,7 +1339,20 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
       return;
     }
 
-    // Set loading state
+    // Check if it's coordinates or URL - process immediately without debounce
+    const latLongPattern = /^\s*(-?\d+\.?\d*)\s*[,，]\s*(-?\d+\.?\d*)\s*$/;
+    const isCoordinates = latLongPattern.test(trimmed);
+    const urlCoords = extractCoordsFromUrl(trimmed);
+    
+    if (isCoordinates || urlCoords) {
+      // For coordinates or URLs with coordinates, process immediately
+      setShowSuggestions(false);
+      setIsSearching(false);
+      setHasSearched(false);
+      return; // Don't show suggestions for coordinates/URLs
+    }
+
+    // For regular search queries, use debounce
     setIsSearching(true);
     setShowSuggestions(false);
 
@@ -1281,11 +1395,26 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
     setIsSearching(true);
     setShowSuggestions(false);
     try {
-      const coords = await parseLocationInput(searchQuery);
-      if (coords) {
-        setSelectedPosition(coords);
-        setMapCenter(coords);
-        setSearchQuery(''); // Clear search after successful search
+      const result = await parseLocationInput(searchQuery);
+      if (result) {
+        setSelectedPosition(result.coords);
+        setMapCenter(result.coords);
+        // If landmark checkbox is checked, auto-generate landmark position
+        if (addLandmark) {
+          const [landmarkLat, landmarkLng] = calculateLandmarkLocation(
+            result.coords[0],
+            result.coords[1],
+            landmarkDistance,
+            landmarkDirection
+          );
+          setLandmarkPosition([landmarkLat, landmarkLng]);
+        }
+        // Show extracted coordinates in input if they came from URL, otherwise show the display text
+        if (result.displayText) {
+          setSearchQuery(result.displayText);
+        } else {
+          setSearchQuery(''); // Clear search after successful search
+        }
       } else {
         alert('Location not found. Please try a different search term or enter coordinates directly.');
       }
@@ -1303,6 +1432,16 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
     const lng = parseFloat(suggestion.lon);
     setSelectedPosition([lat, lng]);
     setMapCenter([lat, lng]);
+    // If landmark checkbox is checked, auto-generate landmark position
+    if (addLandmark) {
+      const [landmarkLat, landmarkLng] = calculateLandmarkLocation(
+        lat,
+        lng,
+        landmarkDistance,
+        landmarkDirection
+      );
+      setLandmarkPosition([landmarkLat, landmarkLng]);
+    }
     setSearchQuery(suggestion.display_name);
     setShowSuggestions(false);
   };
@@ -1324,17 +1463,29 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
   // Radius steps: 0, 20, 50, 100, 200, 300, 500, 700, 900, 1100, 1300, 1500, 2000, 5000, 10000, 25000
   const radiusSteps = [0, 20, 50, 100, 200, 300, 500, 700, 900, 1100, 1300, 1500, 2000, 5000, 10000, 25000];
   
-  // Find the closest radius step
-  const getClosestRadiusStep = (value: number): number => {
-    return radiusSteps.reduce((prev, curr) => 
-      Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
-    );
+  // Find the index of the closest radius step
+  const getClosestRadiusStepIndex = (value: number): number => {
+    let closestIndex = 0;
+    let minDiff = Math.abs(radiusSteps[0] - value);
+    for (let i = 1; i < radiusSteps.length; i++) {
+      const diff = Math.abs(radiusSteps[i] - value);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIndex = i;
+      }
+    }
+    return closestIndex;
   };
 
-  // Handle radius change with custom steps
-  const handleRadiusChange = (value: number) => {
-    const closestStep = getClosestRadiusStep(value);
-    setRadius(closestStep);
+  // Get current step index from radius value
+  const getCurrentStepIndex = (): number => {
+    return getClosestRadiusStepIndex(radius);
+  };
+
+  // Handle radius change with equal-width steps
+  const handleRadiusChange = (stepIndex: number) => {
+    const clampedIndex = Math.max(0, Math.min(stepIndex, radiusSteps.length - 1));
+    setRadius(radiusSteps[clampedIndex]);
   };
 
   // Format radius for display
@@ -1346,6 +1497,31 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
 
   const handleMapClick = (lat: number, lng: number) => {
     setSelectedPosition([lat, lng]);
+    // If landmark checkbox is checked, auto-generate landmark position
+    if (addLandmark) {
+      const [landmarkLat, landmarkLng] = calculateLandmarkLocation(
+        lat,
+        lng,
+        landmarkDistance,
+        landmarkDirection
+      );
+      setLandmarkPosition([landmarkLat, landmarkLng]);
+    }
+  };
+
+  // Calculate distance between two points in meters
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLng = (lng2 - lng1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   };
 
 
@@ -1363,6 +1539,16 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
         const lng = position.coords.longitude;
         setSelectedPosition([lat, lng]);
         setMapCenter([lat, lng]);
+        // If landmark checkbox is checked, auto-generate landmark position
+        if (addLandmark) {
+          const [landmarkLat, landmarkLng] = calculateLandmarkLocation(
+            lat,
+            lng,
+            landmarkDistance,
+            landmarkDirection
+          );
+          setLandmarkPosition([landmarkLat, landmarkLng]);
+        }
         setIsGettingLocation(false);
       },
       (error) => {
@@ -1392,6 +1578,48 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
     );
   };
 
+  // Calculate landmark location from property location, distance, and direction
+  const calculateLandmarkLocation = (lat: number, lng: number, distanceMeters: number, direction: string): [number, number] => {
+    // Earth's radius in meters
+    const R = 6371000;
+    
+    // Convert direction to bearing (degrees)
+    const directionToBearing: Record<string, number> = {
+      'north': 0,
+      'northeast': 45,
+      'east': 90,
+      'southeast': 135,
+      'south': 180,
+      'southwest': 225,
+      'west': 270,
+      'northwest': 315,
+    };
+    
+    const bearing = (directionToBearing[direction] || 0) * (Math.PI / 180);
+    
+    // Convert latitude and longitude to radians
+    const latRad = lat * (Math.PI / 180);
+    const lngRad = lng * (Math.PI / 180);
+    
+    // Calculate new latitude
+    const newLatRad = Math.asin(
+      Math.sin(latRad) * Math.cos(distanceMeters / R) +
+      Math.cos(latRad) * Math.sin(distanceMeters / R) * Math.cos(bearing)
+    );
+    
+    // Calculate new longitude
+    const newLngRad = lngRad + Math.atan2(
+      Math.sin(bearing) * Math.sin(distanceMeters / R) * Math.cos(latRad),
+      Math.cos(distanceMeters / R) - Math.sin(latRad) * Math.sin(newLatRad)
+    );
+    
+    // Convert back to degrees
+    const newLat = newLatRad * (180 / Math.PI);
+    const newLng = newLngRad * (180 / Math.PI);
+    
+    return [newLat, newLng];
+  };
+
   const handleSave = () => {
     if (!selectedPosition) {
       alert('Please select a location on the map or search for a place');
@@ -1400,7 +1628,23 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
 
     // Use selectedPosition directly to create the location string
     const locationString = `${selectedPosition[0].toFixed(6)},${selectedPosition[1].toFixed(6)}`;
-    onSave(locationString, radius.toString());
+    
+    // If landmark checkbox is checked, calculate and save landmark location
+    if (addLandmark && landmarkPosition) {
+      const landmarkLocationString = `${landmarkPosition[0].toFixed(6)},${landmarkPosition[1].toFixed(6)}`;
+      // Calculate actual distance between location and landmark
+      const actualDistance = Math.round(calculateDistance(
+        selectedPosition[0],
+        selectedPosition[1],
+        landmarkPosition[0],
+        landmarkPosition[1]
+      ));
+      
+      // Call onSave with both location and landmark location
+      onSave(locationString, radius.toString(), landmarkLocationString, actualDistance.toString());
+    } else {
+      onSave(locationString, radius.toString());
+    }
   };
 
   return (
@@ -1408,7 +1652,7 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl mobile-modal-content sm:max-h-[90vh] overflow-y-auto animate-slide-up">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
           <h3 className="text-lg sm:text-xl font-bold text-gray-900">
-            {hasLocationCoordinates(property.location) ? 'Edit Location' : 'Add Location'}
+            {hasLocationCoordinates(locationField || '') ? 'Edit Location' : 'Add Location'}
           </h3>
           <button
             onClick={onClose}
@@ -1446,11 +1690,26 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
                       setIsSearching(true);
                       setShowSuggestions(false);
                       try {
-                        const coords = await parseLocationInput(pastedText);
-                        if (coords) {
-                          setSelectedPosition(coords);
-                          setMapCenter(coords);
-                          setSearchQuery(''); // Clear search after successful search
+                        const result = await parseLocationInput(pastedText);
+                        if (result) {
+                          setSelectedPosition(result.coords);
+                          setMapCenter(result.coords);
+                          // If landmark checkbox is checked, auto-generate landmark position
+                          if (addLandmark) {
+                            const [landmarkLat, landmarkLng] = calculateLandmarkLocation(
+                              result.coords[0],
+                              result.coords[1],
+                              landmarkDistance,
+                              landmarkDirection
+                            );
+                            setLandmarkPosition([landmarkLat, landmarkLng]);
+                          }
+                          // Show extracted coordinates in input if they came from URL, otherwise show the display text
+                          if (result.displayText) {
+                            setSearchQuery(result.displayText);
+                          } else {
+                            setSearchQuery(''); // Clear search after successful search
+                          }
                         } else {
                           // If it's a URL but we couldn't extract coords, try showing it as search
                           setSearchQuery(pastedText);
@@ -1543,6 +1802,21 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
                     <MapCenterUpdater center={mapCenter} />
                     <TileLayerSwitcher isSatelliteView={isSatelliteView} />
                     <MapClickHandler onMapClick={handleMapClick} />
+                    
+                    {/* Dotted line between location and landmark */}
+                    {selectedPosition && landmarkPosition && (
+                      <Polyline
+                        positions={[selectedPosition, landmarkPosition]}
+                        pathOptions={{
+                          color: '#3b82f6',
+                          weight: 2,
+                          opacity: 0.6,
+                          dashArray: '10, 5',
+                        }}
+                      />
+                    )}
+                    
+                    {/* Exact Location Marker (Private) */}
                     {selectedPosition && (
                       <>
                         {/* Location Accuracy Radius Circle - Only show if radius > 0 */}
@@ -1551,23 +1825,123 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
                             center={selectedPosition}
                             radius={radius}
                             pathOptions={{
-                              color: '#3b82f6',
-                              fillColor: '#3b82f6',
+                              color: '#ef4444',
+                              fillColor: '#ef4444',
                               fillOpacity: 0.1,
                               weight: 2,
                               opacity: 0.5,
                             }}
                           />
                         )}
-                        <Marker position={selectedPosition}>
+                        <Marker
+                          position={selectedPosition}
+                          draggable={true}
+                          eventHandlers={{
+                            dragend: (e) => {
+                              const marker = e.target;
+                              const position = marker.getLatLng();
+                              setSelectedPosition([position.lat, position.lng]);
+                              // If landmark checkbox is checked, recalculate landmark position
+                              if (addLandmark && landmarkPosition) {
+                                const distance = calculateDistance(
+                                  position.lat,
+                                  position.lng,
+                                  landmarkPosition[0],
+                                  landmarkPosition[1]
+                                );
+                                // Keep landmark at same distance but adjust direction
+                                const [landmarkLat, landmarkLng] = calculateLandmarkLocation(
+                                  position.lat,
+                                  position.lng,
+                                  distance,
+                                  landmarkDirection
+                                );
+                                setLandmarkPosition([landmarkLat, landmarkLng]);
+                              }
+                            },
+                          }}
+                          icon={L.divIcon({
+                            className: 'custom-private-marker',
+                            html: `<div style="
+                              width: 30px;
+                              height: 30px;
+                              background-color: #ef4444;
+                              border: 3px solid white;
+                              border-radius: 50%;
+                              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                            ">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                              </svg>
+                            </div>`,
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 15],
+                            popupAnchor: [0, -15]
+                          })}
+                        >
                           <Popup>
-                            Selected Location<br />
-                            {selectedPosition[0].toFixed(6)}, {selectedPosition[1].toFixed(6)}
-                            <br />
-                            Accuracy: {formatRadius(radius)}
+                            <div className="flex items-center gap-2">
+                              <Lock className="w-4 h-4 text-red-600" />
+                              <span className="font-semibold">Exact Location (Private)</span>
+                            </div>
+                            <div className="mt-1 text-sm">
+                              {selectedPosition[0].toFixed(6)}, {selectedPosition[1].toFixed(6)}
+                            </div>
+                            {radius > 0 && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Accuracy: {formatRadius(radius)}
+                              </div>
+                            )}
                           </Popup>
                         </Marker>
                       </>
+                    )}
+                    
+                    {/* Landmark Location Marker (Public) */}
+                    {landmarkPosition && addLandmark && (
+                      <Marker
+                        position={landmarkPosition}
+                        draggable={true}
+                        eventHandlers={{
+                          dragend: (e) => {
+                            const marker = e.target;
+                            const position = marker.getLatLng();
+                            setLandmarkPosition([position.lat, position.lng]);
+                          },
+                        }}
+                        icon={L.icon({
+                          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+                          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                          iconSize: [25, 41],
+                          iconAnchor: [12, 41],
+                          popupAnchor: [1, -34],
+                          shadowSize: [41, 41]
+                        })}
+                      >
+                        <Popup>
+                          <div className="flex items-center gap-2">
+                            <Globe className="w-4 h-4 text-blue-600" />
+                            <span className="font-semibold">Landmark Location (Public)</span>
+                          </div>
+                          <div className="text-sm mt-1">
+                            {landmarkPosition[0].toFixed(6)}, {landmarkPosition[1].toFixed(6)}
+                          </div>
+                          {selectedPosition && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Distance: {Math.round(calculateDistance(
+                                selectedPosition[0],
+                                selectedPosition[1],
+                                landmarkPosition[0],
+                                landmarkPosition[1]
+                              ))}m
+                            </div>
+                          )}
+                        </Popup>
+                      </Marker>
                     )}
                   </MapContainer>
                   
@@ -1615,14 +1989,29 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
             </div>
             <p className="text-xs text-gray-500 mt-1.5">
               {selectedPosition ? (
-                <>Selected Location: {selectedPosition[0].toFixed(6)}, {selectedPosition[1].toFixed(6)}</>
+                <>
+                  <span className="font-semibold">Exact Location:</span> {selectedPosition[0].toFixed(6)}, {selectedPosition[1].toFixed(6)}
+                  {landmarkPosition && addLandmark && (
+                    <>
+                      <br />
+                      <span className="font-semibold">Landmark Location:</span> {landmarkPosition[0].toFixed(6)}, {landmarkPosition[1].toFixed(6)}
+                      <br />
+                      <span className="font-semibold">Distance:</span> {Math.round(calculateDistance(
+                        selectedPosition[0],
+                        selectedPosition[1],
+                        landmarkPosition[0],
+                        landmarkPosition[1]
+                      ))}m
+                    </>
+                  )}
+                </>
               ) : (
                 <>Click anywhere on the map to set the location. The map is centered on {user?.default_city || property.city || 'Panipat'}.</>
               )}
             </p>
           </div>
 
-          {/* Radius Section */}
+          {/* Location Accuracy Section */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Location Accuracy Radius: {formatRadius(radius)}
@@ -1630,25 +2019,51 @@ function LocationModal({ property, onClose, onSave }: LocationModalProps) {
             <input
               type="range"
               min="0"
-              max="25000"
+              max={radiusSteps.length - 1}
               step="1"
-              value={radius}
+              value={getCurrentStepIndex()}
               onChange={(e) => handleRadiusChange(parseInt(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1 flex-wrap gap-1">
-              <span>0 m</span>
-              <span>100 m</span>
-              <span>500 m</span>
-              <span>1.5 km</span>
-              <span>2 km</span>
-              <span>10 km</span>
-              <span>25 km</span>
-            </div>
+          
             <p className="text-xs text-gray-500 mt-1.5">
-              This radius indicates the accuracy of the location. A smaller radius means more precise location. Steps: 0, 20, 50, 100, 200, 300, 500, 700, 900, 1100, 1300, 1500, 2 km, 5 km, 10 km, 25 km
+              This radius indicates the accuracy of the exact location. A smaller radius means more precise location. 
             </p>
           </div>
+
+          {/* Landmark Location Checkbox */}
+          {selectedPosition && (
+            <div className="flex items-start gap-3 pt-2 border-t border-gray-200">
+              <input
+                type="checkbox"
+                id="addLandmark"
+                checked={addLandmark}
+                onChange={(e) => {
+                  setAddLandmark(e.target.checked);
+                  if (!e.target.checked) {
+                    setLandmarkPosition(null);
+                  } else if (selectedPosition) {
+                    const [landmarkLat, landmarkLng] = calculateLandmarkLocation(
+                      selectedPosition[0],
+                      selectedPosition[1],
+                      landmarkDistance,
+                      landmarkDirection
+                    );
+                    setLandmarkPosition([landmarkLat, landmarkLng]);
+                  }
+                }}
+                className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+              />
+              <label htmlFor="addLandmark" className="flex-1 text-sm text-gray-700 cursor-pointer">
+                Add a landmark {landmarkPosition && addLandmark ? Math.round(calculateDistance(
+                  selectedPosition[0],
+                  selectedPosition[1],
+                  landmarkPosition[0],
+                  landmarkPosition[1]
+                )) : landmarkDistance} meters away for public view.
+              </label>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-3 pt-4">
@@ -1681,8 +2096,8 @@ interface LocationViewModalProps {
   onOpenInGoogleMaps: () => void;
 }
 
-// Component to update map bounds to show both property and user location
-function MapBoundsUpdater({ propertyLocation, userLocation, hasUserLocation, isInitialLoad }: { propertyLocation: [number, number]; userLocation: [number, number] | null; hasUserLocation: boolean; isInitialLoad: boolean }) {
+// Component to update map bounds to show property, landmark, and user location
+function MapBoundsUpdater({ propertyLocation, landmarkLocation, userLocation, hasUserLocation, isInitialLoad }: { propertyLocation: [number, number]; landmarkLocation: [number, number] | null; userLocation: [number, number] | null; hasUserLocation: boolean; isInitialLoad: boolean }) {
   const map = useMap();
   
   useEffect(() => {
@@ -1709,9 +2124,18 @@ function MapBoundsUpdater({ propertyLocation, userLocation, hasUserLocation, isI
     if (isInitialLoad) {
       const updateBounds = () => {
         try {
+          const locationsToFit: [number, number][] = [propertyLocation];
+          
+          if (landmarkLocation) {
+            locationsToFit.push(landmarkLocation);
+          }
+          
           if (hasUserLocation && userLocation) {
-            // Create bounds that include both locations
-            const bounds = L.latLngBounds([propertyLocation, userLocation]);
+            locationsToFit.push(userLocation);
+          }
+          
+          if (locationsToFit.length > 1) {
+            const bounds = L.latLngBounds(locationsToFit);
             map.fitBounds(bounds, { padding: [50, 50] });
           } else {
             // Just center on property location
@@ -1729,12 +2153,25 @@ function MapBoundsUpdater({ propertyLocation, userLocation, hasUserLocation, isI
     return () => {
       timers.forEach(timer => clearTimeout(timer));
     };
-  }, [propertyLocation, userLocation, hasUserLocation, isInitialLoad, map]);
+  }, [propertyLocation, landmarkLocation, userLocation, hasUserLocation, isInitialLoad, map]);
   
   return null;
 }
 
 function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogleMaps }: LocationViewModalProps) {
+  // Parse landmark location
+  const landmarkLocationCoords = (() => {
+    if (!property.landmark_location) return null;
+    const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test(property.landmark_location.trim());
+    if (hasCoords) {
+      const parts = property.landmark_location.split(',').map(c => parseFloat(c.trim()));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        return [parts[0], parts[1]] as [number, number];
+      }
+    }
+    return null;
+  })();
+
   // Load saved map view preference from localStorage, default to map view (false = map, true = satellite)
   const [isSatelliteView, setIsSatelliteView] = useState(() => {
     const saved = localStorage.getItem('mapViewPreference');
@@ -1744,9 +2181,23 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const mapCenter: [number, number] = userLocation 
-    ? [(propertyLocation.lat + userLocation[0]) / 2, (propertyLocation.lng + userLocation[1]) / 2]
-    : [propertyLocation.lat, propertyLocation.lng];
+  
+  // Calculate map center to include both property and landmark if available
+  const mapCenter: [number, number] = (() => {
+    if (landmarkLocationCoords) {
+      return [
+        (propertyLocation.lat + landmarkLocationCoords[0]) / 2,
+        (propertyLocation.lng + landmarkLocationCoords[1]) / 2
+      ];
+    }
+    if (userLocation) {
+      return [
+        (propertyLocation.lat + userLocation[0]) / 2,
+        (propertyLocation.lng + userLocation[1]) / 2
+      ];
+    }
+    return [propertyLocation.lat, propertyLocation.lng];
+  })();
 
   // Save view preference to localStorage when it changes
   useEffect(() => {
@@ -1828,14 +2279,51 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
 
 
   // Create custom icons for markers
-  const propertyIcon = L.icon({
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
+  // Exact location icon (red, private)
+  const exactLocationIcon = L.divIcon({
+    className: 'custom-private-marker',
+    html: `<div style="
+      width: 30px;
+      height: 30px;
+      background-color: #ef4444;
+      border: 3px solid white;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+      </svg>
+    </div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15]
+  });
+
+  // Landmark location icon (blue, faded, public)
+  const landmarkLocationIcon = L.divIcon({
+    className: 'custom-landmark-marker',
+    html: `<div style="
+      width: 30px;
+      height: 30px;
+      background-color: #3b82f6;
+      border: 3px solid white;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.7;
+    ">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      </svg>
+    </div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15]
   });
 
   // Create a blue circle marker icon for user location
@@ -1891,20 +2379,34 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
             >
                 <MapBoundsUpdater 
                   propertyLocation={[propertyLocation.lat, propertyLocation.lng]} 
+                  landmarkLocation={landmarkLocationCoords}
                   userLocation={userLocation}
                   hasUserLocation={!!userLocation}
                   isInitialLoad={isInitialLoad}
                 />
                 <TileLayerSwitcher isSatelliteView={isSatelliteView} />
                 
-                {/* Property Location Radius Circle */}
+                {/* Dotted line between exact location and landmark */}
+                {landmarkLocationCoords && (
+                  <Polyline
+                    positions={[[propertyLocation.lat, propertyLocation.lng], landmarkLocationCoords]}
+                    pathOptions={{
+                      color: '#3b82f6',
+                      weight: 2,
+                      opacity: 0.6,
+                      dashArray: '10, 5',
+                    }}
+                  />
+                )}
+                
+                {/* Exact Location Radius Circle */}
                 {property.location_accuracy && (
                   <Circle
                     center={[propertyLocation.lat, propertyLocation.lng]}
                     radius={parseFloat(property.location_accuracy) || 500}
                     pathOptions={{
-                      color: '#3b82f6',
-                      fillColor: '#3b82f6',
+                      color: '#ef4444',
+                      fillColor: '#ef4444',
                       fillOpacity: 0.1,
                       weight: 2,
                       opacity: 0.5,
@@ -1912,14 +2414,17 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
                   />
                 )}
                 
-                {/* Property Location Marker */}
+                {/* Exact Location Marker (Private) */}
                 <Marker 
                   position={[propertyLocation.lat, propertyLocation.lng]}
-                  icon={propertyIcon}
+                  icon={exactLocationIcon}
                 >
                   <Popup>
                     <div className="p-2">
-                      <h3 className="font-semibold text-sm mb-1">{property.type} #{property.id}</h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Lock className="w-4 h-4 text-red-600" />
+                        <h3 className="font-semibold text-sm">Exact Location (Private)</h3>
+                      </div>
                       <p className="text-xs text-gray-600 mb-1">
                         {property.area}, {property.city}
                       </p>
@@ -1927,13 +2432,41 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
                         {propertyLocation.lat.toFixed(6)}, {propertyLocation.lng.toFixed(6)}
                       </p>
                       {property.location_accuracy && (
-                        <p className="text-xs text-blue-600 mt-1">
+                        <p className="text-xs text-red-600 mt-1">
                           Accuracy: {property.location_accuracy}m
                         </p>
                       )}
                     </div>
                   </Popup>
                 </Marker>
+
+                {/* Landmark Location Marker (Public) */}
+                {landmarkLocationCoords && (
+                  <Marker 
+                    position={landmarkLocationCoords}
+                    icon={landmarkLocationIcon}
+                  >
+                    <Popup>
+                      <div className="p-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Globe className="w-4 h-4 text-blue-600" />
+                          <h3 className="font-semibold text-sm">Landmark Location (Public)</h3>
+                        </div>
+                        <p className="text-xs text-gray-600 mb-1">
+                          {property.area}, {property.city}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {landmarkLocationCoords[0].toFixed(6)}, {landmarkLocationCoords[1].toFixed(6)}
+                        </p>
+                        {property.landmark_location_distance && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            Distance: {property.landmark_location_distance}m
+                          </p>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
 
                 {/* User Location Marker */}
                 {userLocation && (
@@ -1991,15 +2524,27 @@ function LocationViewModal({ propertyLocation, property, onClose, onOpenInGoogle
           </div>
         </div>
 
-        {/* Full Width Button to Open in Google Maps */}
-        <div className="border-t border-gray-200 p-4 sm:p-6 bg-white">
+        {/* Navigate Buttons */}
+        <div className="border-t border-gray-200 p-4 sm:p-6 bg-white space-y-2">
           <button
             onClick={onOpenInGoogleMaps}
-            className="w-full px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-center gap-2 bg-blue-600 text-white text-sm sm:text-base font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg"
+            className="w-full px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-center gap-2 bg-red-600 text-white text-sm sm:text-base font-semibold rounded-xl hover:bg-red-700 transition-colors shadow-lg"
           >
-            <MapIcon className="w-5 h-5" />
-            Open in Google Maps
+            <Navigation className="w-5 h-5" />
+            Navigate to Location
           </button>
+          {landmarkLocationCoords && (
+            <button
+              onClick={() => {
+                const url = `https://www.google.com/maps?q=${landmarkLocationCoords[0]},${landmarkLocationCoords[1]}`;
+                window.open(url, '_blank');
+              }}
+              className="w-full px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-center gap-2 bg-blue-600 text-white text-sm sm:text-base font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg opacity-90"
+            >
+              <Navigation className="w-5 h-5" />
+              Navigate to Landmark
+            </button>
+          )}
         </div>
       </div>
     </div>

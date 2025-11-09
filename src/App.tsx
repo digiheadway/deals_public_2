@@ -423,6 +423,16 @@ function App() {
     }
   };
 
+  const handleUpdateLandmarkLocation = async (id: number, landmarkLocation: string, landmarkLocationDistance: string) => {
+    try {
+      await propertyApi.updateProperty(id, ownerId, { landmark_location: landmarkLocation, landmark_location_distance: landmarkLocationDistance });
+      showToast('Landmark location updated successfully', 'success');
+      await refreshPropertiesAndFilters(true);
+    } catch (error) {
+      showToast('Failed to update landmark location', 'error');
+    }
+  };
+
   const handleShare = async (property: Property) => {
     const sizeText = property.min_size === property.size_max
       ? `${property.min_size} ${property.size_unit}`
@@ -716,6 +726,7 @@ function App() {
             handleContactSubmit={handleContactSubmit}
             handleUpdateHighlightsAndTags={handleUpdateHighlightsAndTags}
             handleUpdateLocation={handleUpdateLocation}
+            handleUpdateLandmarkLocation={handleUpdateLandmarkLocation}
             showToast={showToast}
           />
         ) : (
@@ -772,6 +783,7 @@ function App() {
             handleContactSubmit={handleContactSubmit}
             handleUpdateHighlightsAndTags={handleUpdateHighlightsAndTags}
             handleUpdateLocation={handleUpdateLocation}
+            handleUpdateLandmarkLocation={handleUpdateLandmarkLocation}
             showToast={showToast}
           />
         ) : (
@@ -828,6 +840,7 @@ function App() {
             handleContactSubmit={handleContactSubmit}
             handleUpdateHighlightsAndTags={handleUpdateHighlightsAndTags}
             handleUpdateLocation={handleUpdateLocation}
+            handleUpdateLandmarkLocation={handleUpdateLandmarkLocation}
             showToast={showToast}
           />
         ) : (
@@ -902,6 +915,7 @@ interface MainAppContentProps {
   handleContactSubmit: (message: string, phone: string) => Promise<void>;
   handleUpdateHighlightsAndTags: (id: number, highlights: string, tags: string) => Promise<void>;
   handleUpdateLocation: (id: number, location: string, locationAccuracy: string) => Promise<void>;
+  handleUpdateLandmarkLocation: (id: number, landmarkLocation: string, landmarkLocationDistance: string) => Promise<void>;
   showToast: (message: string, type: 'success' | 'error') => void;
 }
 
@@ -948,6 +962,7 @@ function MainAppContent({
   handleContactSubmit,
   handleUpdateHighlightsAndTags,
   handleUpdateLocation,
+  handleUpdateLandmarkLocation,
   showToast,
 }: MainAppContentProps) {
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
@@ -1174,6 +1189,7 @@ function MainAppContent({
           onAskQuestion={handleAskQuestion}
           onUpdateHighlightsAndTags={handleUpdateHighlightsAndTags}
           onUpdateLocation={handleUpdateLocation}
+          onUpdateLandmarkLocation={handleUpdateLandmarkLocation}
         />
       )}
 
