@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Download } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -16,6 +16,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
   const [isDismissed, setIsDismissed] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
 
   useEffect(() => {
     // Check if iOS
@@ -53,24 +54,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
       e.preventDefault();
       const promptEvent = e as BeforeInstallPromptEvent;
       setDeferredPrompt(promptEvent);
-      
-      // Show prompt after a short delay
-      const autoPromptShown = sessionStorage.getItem('pwa-auto-prompt-shown');
-      if (!autoPromptShown) {
-        setTimeout(async () => {
-          try {
-            await promptEvent.prompt();
-            sessionStorage.setItem('pwa-auto-prompt-shown', 'true');
-            const choiceResult = await promptEvent.userChoice;
-            if (choiceResult.outcome === 'accepted') {
-              setDeferredPrompt(null);
-            }
-          } catch (error) {
-            console.error('Error showing install prompt:', error);
-            sessionStorage.removeItem('pwa-auto-prompt-shown');
-          }
-        }, 3000);
-      }
+      // Don't auto-show prompt, wait for user to click install
     };
 
     // Listen for app installed event
@@ -120,24 +104,21 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
     };
   }, []);
 
-  const handleInstall = async () => {
+  const handleInstallClick = () => {
+    // Show instructions first
+    setShowInstructions(true);
+  };
+
+  const handleConfirmInstall = async () => {
+    setShowInstructions(false);
+    
     if (!deferredPrompt) {
+      // No prompt available, show manual instructions
       const isAndroid = /Android/.test(navigator.userAgent);
       
       if (isIOS) {
         alert('To install Dealer Network:\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" in the top right');
       } else if (isAndroid) {
-        alert('To install Dealer Network:\n1. Tap the menu (⋮) in your browser\n2. Tap "Install app" or "Add to Home screen"');
-      } else {
-        alert('Look for the install icon in your browser\'s address bar, or check the browser menu for "Install" option.');
-      }
-      return;
-    }
-
-    const autoPromptShown = sessionStorage.getItem('pwa-auto-prompt-shown');
-    if (autoPromptShown) {
-      const isAndroid = /Android/.test(navigator.userAgent);
-      if (isAndroid) {
         alert('To install Dealer Network:\n1. Tap the menu (⋮) in your browser\n2. Tap "Install app" or "Add to Home screen"');
       } else {
         alert('Look for the install icon in your browser\'s address bar, or check the browser menu for "Install" option.');
@@ -180,49 +161,149 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
     return null;
   }
 
+  const getInstructions = () => {
+    const isAndroid = /Android/.test(navigator.userAgent);
+    
+    if (isIOS) {
+      return {
+        title: 'Install on iOS',
+        steps: [
+          'Tap the Share button (square with arrow) at the bottom',
+          'Scroll down and tap "Add to Home Screen"',
+          'Tap "Add" in the top right corner'
+        ]
+      };
+    } else if (isAndroid) {
+      return {
+        title: 'Install on Android',
+        steps: [
+          'Tap the menu (⋮) in your browser',
+          'Tap "Install app" or "Add to Home screen"',
+          'Confirm the installation'
+        ]
+      };
+    } else {
+      return {
+        title: 'Install on Desktop',
+        steps: [
+          'Look for the install icon in your browser\'s address bar',
+          'Or check the browser menu for "Install" option',
+          'Click to install and follow the prompts'
+        ]
+      };
+    }
+  };
+
+  const instructions = getInstructions();
+
   return (
-    <div 
-      className={`w-full relative overflow-hidden rounded-lg transition-all duration-500 ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-      }`}
-    >
-      {/* Main card - double header height (h-28 = 7rem, sm:h-32 = 8rem) */}
-      <div className="relative bg-white border border-gray-200 rounded-lg shadow-md h-28 sm:h-32">
-        <div className="h-full flex items-center px-4 sm:px-6 relative">
-          {/* Close button - positioned at top right */}
-          <button
-            onClick={handleDismiss}
-            className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all z-10"
-            aria-label="Dismiss"
-          >
-            <X className="w-4 h-4" />
-          </button>
+    <>
+      <div 
+        className={`w-full relative overflow-hidden rounded-lg transition-all duration-500 ${
+          isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        }`}
+      >
+        {/* Compact banner - reduced height */}
+        <div className="relative bg-white border border-gray-200 rounded-lg shadow-sm h-16 sm:h-20">
+          <div className="h-full flex items-center px-3 sm:px-4 relative">
+            {/* Close button */}
+            <button
+              onClick={handleDismiss}
+              className="absolute top-1.5 right-1.5 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all z-10"
+              aria-label="Dismiss"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
 
-          {/* Content section */}
-          <div className="flex items-center justify-between w-full pr-8">
-            {/* Left side - Title and description */}
-            <div className="flex-1 min-w-0">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">
-                Install Dealer Network
-              </h3>
-              <p className="text-xs sm:text-sm text-gray-600">
-                Get faster access and a better experience on your device
-              </p>
-            </div>
+            {/* Content section */}
+            <div className="flex items-center justify-between w-full pr-7">
+              {/* Left side - Compact title and description */}
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Download className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">
+                    Install Dealer Network
+                  </h3>
+                  <p className="text-xs text-gray-500 truncate">
+                    Get faster access on your device
+                  </p>
+                </div>
+              </div>
 
-            {/* Right side - Install button */}
-            <div className="flex-shrink-0 ml-4">
-              <button
-                onClick={handleInstall}
-                className="px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-sm hover:shadow-md"
-              >
-                Install
-              </button>
+              {/* Right side - Install button */}
+              <div className="flex-shrink-0 ml-3">
+                <button
+                  onClick={handleInstallClick}
+                  className="px-3 sm:px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-sm hover:shadow"
+                >
+                  Install
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Instructions Modal */}
+      {showInstructions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowInstructions(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">{instructions.title}</h3>
+              <button
+                onClick={() => setShowInstructions(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Follow these steps to install Dealer Network:
+              </p>
+              <ol className="space-y-3">
+                {instructions.steps.map((step, index) => (
+                  <li key={index} className="flex gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold">
+                      {index + 1}
+                    </span>
+                    <span className="text-sm text-gray-700 pt-0.5">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            {deferredPrompt && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowInstructions(false)}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmInstall}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all shadow-sm hover:shadow"
+                >
+                  Continue to Install
+                </button>
+              </div>
+            )}
+            
+            {!deferredPrompt && (
+              <button
+                onClick={() => setShowInstructions(false)}
+                className="w-full px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all shadow-sm hover:shadow"
+              >
+                Got it
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
