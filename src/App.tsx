@@ -66,6 +66,29 @@ function App() {
     return 'general';
   };
 
+  // Load persisted filters from localStorage
+  const loadPersistedFilters = (): FilterOptions => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.FILTERS);
+      if (saved) {
+        const filters = JSON.parse(saved);
+        // Clean empty values
+        return Object.fromEntries(
+          Object.entries(filters).filter(([_, v]) => v !== '' && v !== undefined)
+        ) as FilterOptions;
+      }
+    } catch {}
+    return {};
+  };
+
+  // Load persisted search query from localStorage
+  const loadPersistedSearchQuery = (): string => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.SEARCH_QUERY) || '';
+    } catch {}
+    return '';
+  };
+
   const [activeFilter, setActiveFilter] = useState<FilterType>(loadPersistedFilter());
   const [myProperties, setMyProperties] = useState<Property[]>([]);
   const [publicProperties, setPublicProperties] = useState<Property[]>([]);
@@ -73,13 +96,15 @@ function App() {
   const [loading, setLoading] = useState(false);
   const loadingRef = useRef(false);
   const loadedDataRef = useRef<{ ownerId: number; my: boolean; public: boolean } | null>(null);
+  const isRefreshingRef = useRef(false);
+  const refreshInProgressRef = useRef(false);
   const [showModal, setShowModal] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(loadPersistedSearchQuery());
   const [searchColumn, setSearchColumn] = useState<string>(loadPersistedSearchColumn());
-  const [activeFilters, setActiveFilters] = useState<FilterOptions>({});
+  const [activeFilters, setActiveFilters] = useState<FilterOptions>(loadPersistedFilters());
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
@@ -130,6 +155,17 @@ function App() {
     
     // Prevent duplicate requests
     if (loadingRef.current) return;
+    
+    // If filters or search are active, skip loading all properties
+    // The filter/search API will handle loading the filtered results
+    const hasActiveFilters = Object.keys(activeFilters).length > 0;
+    const hasActiveSearch = searchQuery.trim().length > 0;
+    
+    if (hasActiveFilters || hasActiveSearch) {
+      // Don't load properties here - let handleFilter or handleSearch handle it
+      // They will use the filter/search API directly
+      return;
+    }
     
     // Check if we already have the data we need
     const needsMy = activeFilter === 'my' || activeFilter === 'all';
@@ -183,7 +219,7 @@ function App() {
       loadingRef.current = false;
       setLoading(false);
     });
-  }, [ownerId, location.pathname, isAuthenticated, activeFilter, loadMyProperties, loadPublicProperties]);
+  }, [ownerId, location.pathname, isAuthenticated, activeFilter, loadMyProperties, loadPublicProperties, activeFilters, searchQuery]);
 
   useEffect(() => {
     // Only set default properties if there's no active search or filters
@@ -205,13 +241,71 @@ function App() {
     }
   }, [activeFilter, myProperties, publicProperties, searchQuery, activeFilters]);
 
-  // Re-apply filters after properties are loaded (fixes issue where filters applied before properties load)
-  const filtersReappliedRef = useRef<string>('');
+  // Apply filters/search on initial load if they exist (before properties are loaded)
+  const initialLoadDoneRef = useRef(false);
   useEffect(() => {
+    // Only run once on mount when authenticated and ownerId is available
+    if (initialLoadDoneRef.current || !isAuthenticated || !ownerId || ownerId <= 0) {
+      return;
+    }
+    
+    // Don't run on public property page
+    if (location.pathname.startsWith('/property/')) {
+      return;
+    }
+    
+    const hasActiveFilters = Object.keys(activeFilters).length > 0;
+    const hasActiveSearch = searchQuery.trim().length > 0;
+    
+    // If filters or search exist, apply them immediately using API
+    // This avoids loading all properties first, then filtering
+    if (hasActiveFilters || hasActiveSearch) {
+      initialLoadDoneRef.current = true;
+      if (hasActiveSearch) {
+        handleSearch(searchQuery, searchColumn);
+      } else if (hasActiveFilters) {
+        handleFilter(activeFilters);
+      }
+    } else {
+      initialLoadDoneRef.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, ownerId, location.pathname]); // Only run once when authenticated
+
+  // Re-apply filters after properties are loaded (fixes issue where filters applied before properties load)
+  // NOTE: This is now mostly redundant since we handle filters/search on initial load
+  // Keeping it as a safety net but with stricter guards to prevent duplicate calls
+  const filtersReappliedRef = useRef<string>('');
+  const lastFilterCallRef = useRef<number>(0);
+  
+  useEffect(() => {
+    // Skip if we're currently refreshing (refreshPropertiesAndFilters handles filter application)
+    if (isRefreshingRef.current) {
+      return;
+    }
+    
+    // Skip if we already handled initial load with filters/search
+    if (!initialLoadDoneRef.current) {
+      return;
+    }
+    
+    // Prevent rapid duplicate calls - debounce by 500ms
+    const now = Date.now();
+    if (now - lastFilterCallRef.current < 500) {
+      return;
+    }
+    
     // Only re-apply if we have active filters and properties have been loaded
+    // AND we're not in a filtered state (if filteredProperties has data, filters were already applied)
     const hasProperties = (activeFilter === 'all' && (myProperties.length > 0 || publicProperties.length > 0)) ||
                           (activeFilter === 'my' && myProperties.length > 0) ||
                           (activeFilter === 'public' && publicProperties.length > 0);
+    
+    // If filteredProperties already has data and filters are active, don't re-apply
+    // This means filters were already applied via API
+    if (filteredProperties.length > 0 && Object.keys(activeFilters).length > 0) {
+      return;
+    }
     
     // Create a key from activeFilters to track if we've already re-applied for these specific filters
     const filtersKey = JSON.stringify(activeFilters);
@@ -225,6 +319,7 @@ function App() {
     
     if (shouldReapply) {
       filtersReappliedRef.current = filtersKey;
+      lastFilterCallRef.current = now;
       // Re-apply filters after properties are loaded
       handleFilter(activeFilters);
     }
@@ -234,7 +329,7 @@ function App() {
       filtersReappliedRef.current = '';
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myProperties, publicProperties, activeFilter, activeFilters, searchQuery]); // Only re-run when properties change
+  }, [myProperties, publicProperties, activeFilter, activeFilters, searchQuery, filteredProperties]); // Only re-run when properties change
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -272,6 +367,72 @@ function App() {
 
   // Helper function to refresh all properties and re-apply filters
   const refreshPropertiesAndFilters = useCallback(async (updateSelectedProperty?: boolean) => {
+    // Prevent multiple simultaneous refresh calls
+    if (refreshInProgressRef.current) {
+      return;
+    }
+    refreshInProgressRef.current = true;
+    
+    // Set refreshing flag to prevent useEffect from triggering duplicate filter calls
+    isRefreshingRef.current = true;
+    
+    // Map activeFilter to API list parameter
+    const listParam: 'mine' | 'public' | 'both' = 
+      activeFilter === 'my' ? 'mine' : 
+      activeFilter === 'public' ? 'public' : 
+      'both';
+    
+    const hasActiveFilters = Object.keys(activeFilters).length > 0;
+    const hasActiveSearch = searchQuery.trim().length > 0;
+    
+    // If filters or search are active, use filter/search API directly instead of loading all properties
+    // This avoids making multiple requests (load all + filter)
+    if (hasActiveFilters || hasActiveSearch) {
+      try {
+        if (hasActiveSearch) {
+          // Use search API
+          const searchResults = await propertyApi.searchProperties(ownerId, listParam, searchQuery, searchColumn);
+          let filtered = searchResults;
+          // Apply additional filters client-side if any
+          if (hasActiveFilters) {
+            filtered = applyClientSideFilters(searchResults, activeFilters);
+          }
+          setFilteredProperties(filtered);
+          
+          // Update selectedProperty if needed
+          if (updateSelectedProperty && selectedProperty) {
+            const updatedProperty = filtered.find(p => p.id === selectedProperty.id);
+            if (updatedProperty) {
+              setSelectedProperty(updatedProperty);
+            }
+          }
+        } else if (hasActiveFilters) {
+          // Use filter API directly - single request instead of loading all + filtering
+          const filtered = await propertyApi.filterProperties(ownerId, listParam, activeFilters);
+          setFilteredProperties(filtered);
+          
+          // Update selectedProperty if needed
+          if (updateSelectedProperty && selectedProperty) {
+            const updatedProperty = filtered.find(p => p.id === selectedProperty.id);
+            if (updatedProperty) {
+              setSelectedProperty(updatedProperty);
+            }
+          }
+        }
+      } catch (error) {
+        showToast('Failed to refresh properties', 'error');
+        setFilteredProperties([]);
+      } finally {
+        // Clear refreshing flags
+        refreshInProgressRef.current = false;
+        setTimeout(() => {
+          isRefreshingRef.current = false;
+        }, 100);
+      }
+      return; // Exit early - no need to load all properties
+    }
+    
+    // No filters/search - load properties normally
     // Refresh property lists based on active filter (only load what's needed)
     const loadPromises: Promise<Property[]>[] = [];
     
@@ -284,85 +445,55 @@ function App() {
       loadPromises.push(propertyApi.getUserProperties(ownerId), propertyApi.getPublicProperties(ownerId));
     }
     
-    const results = await Promise.all(loadPromises);
+    const loadedResults = await Promise.all(loadPromises);
     
     // Update state based on what was loaded
+    let myProps: Property[] = [];
+    let publicProps: Property[] = [];
+    
     if (activeFilter === 'my') {
-      setMyProperties(results[0]);
+      myProps = loadedResults[0];
+      setMyProperties(myProps);
       if (loadedDataRef.current) loadedDataRef.current.my = true;
     } else if (activeFilter === 'public') {
-      setPublicProperties(results[0]);
+      publicProps = loadedResults[0];
+      setPublicProperties(publicProps);
       if (loadedDataRef.current) loadedDataRef.current.public = true;
     } else if (activeFilter === 'all') {
-      setMyProperties(results[0]);
-      setPublicProperties(results[1]);
+      myProps = loadedResults[0];
+      publicProps = loadedResults[1];
+      setMyProperties(myProps);
+      setPublicProperties(publicProps);
       if (loadedDataRef.current) {
         loadedDataRef.current.my = true;
         loadedDataRef.current.public = true;
       }
     }
     
+    // Get all properties for current filter
+    const allLoadedProperties = activeFilter === 'all' 
+      ? [...myProps, ...publicProps] 
+      : activeFilter === 'my' 
+        ? myProps 
+        : publicProps;
+    
     // Update selectedProperty if modal is open and updateSelectedProperty is true
     if (updateSelectedProperty && selectedProperty) {
-      const allProps = activeFilter === 'all' ? [...results[0], ...results[1]] : results[0];
-      const updatedProperty = allProps.find(p => p.id === selectedProperty.id);
+      const updatedProperty = allLoadedProperties.find(p => p.id === selectedProperty.id);
       if (updatedProperty) {
         setSelectedProperty(updatedProperty);
       }
     }
     
-    // Re-apply active search/filters after refresh
-    if (searchQuery.trim()) {
-      const listParam: 'mine' | 'public' | 'both' = 
-        activeFilter === 'my' ? 'mine' : 
-        activeFilter === 'public' ? 'public' : 
-        'both';
-      try {
-        const results = await propertyApi.searchProperties(ownerId, listParam, searchQuery, searchColumn);
-        let filtered = results;
-        if (Object.keys(activeFilters).length > 0) {
-          filtered = applyClientSideFilters(results, activeFilters);
-        }
-        setFilteredProperties(filtered);
-      } catch (error) {
-        // If search fails, use fresh data from state
-        if (activeFilter === 'all') {
-          setFilteredProperties([...results[0], ...results[1]]);
-        } else if (activeFilter === 'my') {
-          setFilteredProperties(results[0]);
-        } else if (activeFilter === 'public') {
-          setFilteredProperties(results[0]);
-        }
-      }
-    } else if (Object.keys(activeFilters).length > 0) {
-      const listParam: 'mine' | 'public' | 'both' = 
-        activeFilter === 'my' ? 'mine' : 
-        activeFilter === 'public' ? 'public' : 
-        'both';
-      try {
-        const results = await propertyApi.filterProperties(ownerId, listParam, activeFilters);
-        setFilteredProperties(results);
-      } catch (error) {
-        // If filter fails, use fresh data from state
-        if (activeFilter === 'all') {
-          setFilteredProperties([...results[0], ...results[1]]);
-        } else if (activeFilter === 'my') {
-          setFilteredProperties(results[0]);
-        } else if (activeFilter === 'public') {
-          setFilteredProperties(results[0]);
-        }
-      }
-    } else {
-      // No search/filters, use fresh data directly
-      if (activeFilter === 'all') {
-        setFilteredProperties([...results[0], ...results[1]]);
-      } else if (activeFilter === 'my') {
-        setFilteredProperties(results[0]);
-      } else if (activeFilter === 'public') {
-        setFilteredProperties(results[0]);
-      }
-    }
-  }, [ownerId, searchQuery, searchColumn, activeFilter, activeFilters, applyClientSideFilters, selectedProperty]);
+    // No filters/search - use fresh data directly
+    setFilteredProperties(allLoadedProperties);
+    
+    // Clear refreshing flags after a short delay to allow state updates to complete
+    refreshInProgressRef.current = false;
+    setTimeout(() => {
+      isRefreshingRef.current = false;
+    }, 100);
+  }, [ownerId, searchQuery, searchColumn, activeFilter, activeFilters, applyClientSideFilters, selectedProperty, showToast]);
 
   const handleAddProperty = async (data: PropertyFormData) => {
     try {
@@ -537,6 +668,9 @@ function App() {
         return;
       }
 
+      // Set loading state
+      setLoading(true);
+
       try {
         // If there's a search query, use search API
         if (query.trim()) {
@@ -549,7 +683,8 @@ function App() {
           // Always set filteredProperties, even if empty (to show "no results")
           setFilteredProperties(filtered);
         } else if (Object.keys(activeFilters).length > 0) {
-          // If only filters (no search), use filter API
+          // If only filters (no search), use filter API directly
+          // This avoids loading all properties first, then filtering
           const results = await propertyApi.filterProperties(ownerId, listParam, activeFilters);
           // Always set filteredProperties, even if empty (to show "no results")
           setFilteredProperties(results);
@@ -558,9 +693,11 @@ function App() {
         showToast('Search failed', 'error');
         // On error, set empty array to show "no results" instead of falling back to base properties
         setFilteredProperties([]);
+      } finally {
+        setLoading(false);
       }
     },
-    [activeFilter, myProperties, publicProperties, ownerId, activeFilters, applyClientSideFilters, searchColumn]
+    [activeFilter, myProperties, publicProperties, ownerId, activeFilters, applyClientSideFilters, searchColumn, showToast]
   );
 
   const handleFilter = useCallback(
@@ -576,6 +713,7 @@ function App() {
 
       // If no filters and no search query, show default list
       if (Object.keys(filters).length === 0 && !searchQuery.trim()) {
+        // Clear filters - load properties normally
         if (activeFilter === 'all') {
           setFilteredProperties([...myProperties, ...publicProperties]);
         } else if (activeFilter === 'my') {
@@ -586,6 +724,9 @@ function App() {
         return;
       }
 
+      // Set loading state
+      setLoading(true);
+      
       try {
         // If there's a search query, use search API and apply filters client-side
         if (searchQuery.trim()) {
@@ -593,7 +734,8 @@ function App() {
           const filtered = applyClientSideFilters(results, filters);
           setFilteredProperties(filtered);
         } else {
-          // If only filters (no search), use filter API
+          // If only filters (no search), use filter API directly
+          // This avoids loading all properties first, then filtering
           const results = await propertyApi.filterProperties(ownerId, listParam, filters);
           // Always set filteredProperties, even if empty (to show "no results")
           setFilteredProperties(results);
@@ -602,6 +744,8 @@ function App() {
         showToast('Filter failed', 'error');
         // On error, set empty array to show "no results" instead of falling back to base properties
         setFilteredProperties([]);
+      } finally {
+        setLoading(false);
       }
     },
     [activeFilter, myProperties, publicProperties, ownerId, searchQuery, searchColumn, applyClientSideFilters, showToast]
