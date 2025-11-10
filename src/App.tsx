@@ -835,22 +835,8 @@ function App() {
       showToast('Owner phone number not available', 'error');
       return;
     }
-
-    // Remove any non-digit characters except + for international format
-    const phoneNumber = property.owner_phone.replace(/[^\d+]/g, '');
-    
-    // Create property link
-    const propertyLink = `${window.location.origin}/property/${property.id}`;
-    
-    // Create message with property details and link
-    const sizeText = formatSize(property.min_size, property.size_max, property.size_unit);
-    const priceText = formatPriceWithLabel(property.price_min, property.price_max);
-    
-    const message = `Hi, I'm interested in this property:\n\n${property.type} in ${property.area}, ${property.city}\n${property.description ? property.description + '\n' : ''}Size: ${sizeText}\nPrice: ${priceText}\n\nView property: ${propertyLink}`;
-    
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-    showToast('Opening WhatsApp...', 'success');
+    setSelectedProperty(property);
+    setShowContactModal(true);
   };
 
   const handleContactSubmit = async (_message: string, _phone: string) => {
@@ -1626,7 +1612,7 @@ function MainAppContent({
         }>
           <ContactModal
             property={selectedProperty}
-            ownerPhone="919710858000"
+            ownerPhone={selectedProperty.owner_phone || ''}
             senderId={ownerId}
             onClose={() => {
               setShowContactModal(false);

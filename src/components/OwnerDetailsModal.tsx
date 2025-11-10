@@ -2,6 +2,7 @@ import { X, Phone, MessageCircle } from 'lucide-react';
 import { Property } from '../types/property';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 import { formatPriceWithLabel } from '../utils/priceFormatter';
+import { formatSize } from '../utils/sizeFormatter';
 import { useEffect } from 'react';
 
 interface OwnerDetailsModalProps {
@@ -36,9 +37,7 @@ export function OwnerDetailsModal({
       const propertyLink = `${window.location.origin}/property/${property.id}`;
       
       // Create message with property details and link
-      const sizeText = property.min_size === property.size_max
-        ? `${property.min_size} ${property.size_unit}`
-        : `${property.min_size}-${property.size_max} ${property.size_unit}`;
+      const sizeText = formatSize(property.min_size, property.size_max, property.size_unit);
       const priceText = formatPriceWithLabel(property.price_min, property.price_max);
       
       const message = `Hi, I'm interested in this property:\n\n${property.type} in ${property.area}, ${property.city}\n${property.description ? property.description + '\n' : ''}Size: ${sizeText}\nPrice: ${priceText}\n\nView property: ${propertyLink}`;
@@ -76,15 +75,6 @@ export function OwnerDetailsModal({
               <p className="text-xs sm:text-sm text-gray-600 mb-1">Owner Name</p>
               <p className="text-sm sm:text-base font-semibold text-gray-900">
                 {property.owner_name}
-              </p>
-            </div>
-          )}
-
-          {property.owner_id && (
-            <div>
-              <p className="text-xs sm:text-sm text-gray-600 mb-1">Owner ID</p>
-              <p className="text-sm sm:text-base font-semibold text-gray-900">
-                {property.owner_id}
               </p>
             </div>
           )}

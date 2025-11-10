@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X, Send } from 'lucide-react';
 import { Property } from '../types/property';
-import { formatPrice } from '../utils/priceFormatter';
+import { formatPrice, formatPriceWithLabel } from '../utils/priceFormatter';
+import { formatSize } from '../utils/sizeFormatter';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 
 interface ContactModalProps {
@@ -40,13 +41,27 @@ export function ContactModal({
 
   const handleSendQuestion = async () => {
     if (!question.trim()) return;
+    if (!ownerPhone) {
+      console.error('Owner phone number not available');
+      return;
+    }
 
     setLoading(true);
     try {
-      const message = `Hi, I'm interested in the ${property.type} at ${property.area}, ${property.city}.\n\nMy Question: ${question}\n\nProperty ID: ${property.id}\nSender ID: ${senderId}`;
+      // Create property link
+      const propertyLink = `${window.location.origin}/property/${property.id}`;
+      
+      // Format property details
+      const sizeText = formatSize(property.min_size, property.size_max, property.size_unit);
+      const priceText = formatPriceWithLabel(property.price_min, property.price_max);
+      
+      // Create message with property details, question, and link
+      const message = `Hi, I'm interested in this property:\n\n${property.type} in ${property.area}, ${property.city}\n${property.description ? property.description + '\n' : ''}Size: ${sizeText}\nPrice: ${priceText}\n\nMy Question: ${question}\n\nView property: ${propertyLink}`;
 
+      // Remove any non-digit characters except + for international format
+      const phoneNumber = ownerPhone.replace(/[^\d+]/g, '');
       const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${ownerPhone.replace(/[^0-9]/g, '')}?text=${encodedMessage}`;
+      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
 
       window.open(whatsappUrl, '_blank');
       onSubmit(question, ownerPhone);
