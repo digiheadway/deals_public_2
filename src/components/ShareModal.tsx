@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Copy, Share2, Check } from 'lucide-react';
 import { Property } from '../types/property';
 import { formatPriceWithLabel } from '../utils/priceFormatter';
+import { formatSize } from '../utils/sizeFormatter';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 
 interface ShareModalProps {
@@ -64,14 +65,25 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
   const buildShareText = (): string => {
     const parts: string[] = [];
 
-    if (selectedFields.id) {
-      parts.push(`ID: ${property.id}`);
-    }
-
+    // Heading (no label)
     if (selectedFields.heading) {
-      parts.push(property.type);
+      const sizeText = formatSize(property.min_size, property.size_max, property.size_unit);
+      const headingParts: string[] = [];
+      if (sizeText) {
+        headingParts.push(sizeText);
+      }
+      headingParts.push(property.type);
+      if (property.area && property.city) {
+        headingParts.push(`in ${property.area}, ${property.city}`);
+      } else if (property.area) {
+        headingParts.push(`in ${property.area}`);
+      } else if (property.city) {
+        headingParts.push(`in ${property.city}`);
+      }
+      parts.push(headingParts.join(' '));
     }
 
+    // Price
     if (selectedFields.price) {
       const priceText = formatPriceWithLabel(property.price_min, property.price_max);
       if (priceText) {
@@ -79,14 +91,17 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
       }
     }
 
+    // Description (with "Descrption - " prefix - note the misspelling)
     if (selectedFields.description && property.description) {
-      parts.push(property.description);
+      parts.push(`Descrption - ${property.description}`);
     }
 
+    // Note
     if (selectedFields.note && property.note_private) {
       parts.push(`Note: ${property.note_private}`);
     }
 
+    // Location
     if (selectedFields.locationLink && hasLocation && locationCoords) {
       const googleMapsUrl = `https://www.google.com/maps?q=${locationCoords.lat},${locationCoords.lng}`;
       const locationText = property.location_accuracy
@@ -95,6 +110,7 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
       parts.push(locationText);
     }
 
+    // Landmark
     if (selectedFields.landmarkLink && property.landmark_location) {
       const landmarkText = property.landmark_location_distance
         ? `Landmark: ${property.landmark_location} (${property.landmark_location_distance} away)`
@@ -102,11 +118,18 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
       parts.push(landmarkText);
     }
 
+    // Separator and View Link
     if (selectedFields.link && shareUrl) {
-      parts.push(`Link: ${shareUrl}`);
+      parts.push('---');
+      parts.push(`View Here: ${shareUrl}`);
     }
 
-    return parts.join('\n\n');
+    // ID at the end
+    if (selectedFields.id) {
+      parts.push(`Id : ${property.id}`);
+    }
+
+    return parts.join('\n');
   };
 
   const handleCopy = () => {
@@ -295,7 +318,7 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
                     {selectedFields.link && <Check className="w-3 h-3 text-white" />}
                   </div>
                 </div>
-                <span className="text-xs font-medium text-gray-900">Link</span>
+                <span className="text-xs font-medium text-gray-900">View Link</span>
               </label>
             )}
           </div>
