@@ -10,6 +10,7 @@ import {
   SIZE_UNIT_OPTIONS,
 } from '../utils/filterOptions';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
+import { fetchAreaCityDataInBackground, getAreaCityData, getAreasForCity } from '../utils/areaCityApi';
 
 interface PropertyModalProps {
   property?: Property | null;
@@ -124,6 +125,11 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [showPropertyTypeDropdown, setShowPropertyTypeDropdown] = useState(false);
   
+  // Dynamic area/city data from API
+  const [cities, setCities] = useState<string[]>([]);
+  const [areas, setAreas] = useState<string[]>([]);
+  const [cityOptionsWithLabels, setCityOptionsWithLabels] = useState<Array<{ value: string; label: string }>>([]);
+  
   const sizeUnitDropdownRef = useRef<HTMLDivElement>(null);
   const cityDropdownRef = useRef<HTMLDivElement>(null);
   const propertyTypeDropdownRef = useRef<HTMLDivElement>(null);
@@ -153,8 +159,34 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
   }, [showSizeUnitDropdown, showCityDropdown, showPropertyTypeDropdown]);
 
   const currentSizeUnitLabel = SIZE_UNIT_OPTIONS.find(opt => opt.value === formData.size_unit)?.label || formData.size_unit;
-  const currentCityLabel = CITY_OPTIONS_WITH_LABELS.find(opt => opt.value === formData.city)?.label || formData.city;
+  const currentCityLabel = cityOptionsWithLabels.find(opt => opt.value === formData.city)?.label || CITY_OPTIONS_WITH_LABELS.find(opt => opt.value === formData.city)?.label || formData.city;
   const currentPropertyTypeLabel = PROPERTY_TYPE_OPTIONS.find(opt => opt.value === formData.type)?.label || formData.type || 'Select property type';
+
+  // Fetch area/city data in background when modal opens (for new properties only)
+  useEffect(() => {
+    if (!property) {
+      // Fetch in background without blocking UI
+      fetchAreaCityDataInBackground();
+      
+      // Also try to load cached data immediately
+      getAreaCityData().then((data) => {
+        if (data) {
+          const cityList = data.cities.map((c) => c.city);
+          setCities(cityList);
+          setCityOptionsWithLabels(cityList.map((city) => ({ value: city, label: city })));
+        }
+      });
+    }
+  }, [property]);
+
+  // Update areas when city changes (after cities are loaded)
+  useEffect(() => {
+    if (formData.city && cities.length > 0) {
+      getAreasForCity(formData.city).then((cityAreas) => {
+        setAreas(cityAreas);
+      });
+    }
+  }, [formData.city, cities]);
 
   // Save draft to localStorage as user types (only for new properties, not edits)
   // Use debounce to prevent excessive re-renders
@@ -366,8 +398,8 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                   <ChevronDown className={`w-2.5 h-2.5 text-gray-500 transition-transform ${showCityDropdown ? 'rotate-180' : ''}`} />
                 </button>
                 {showCityDropdown && (
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 min-w-[120px]">
-                    {CITY_OPTIONS_WITH_LABELS.map((option) => (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 min-w-[120px] max-h-64 overflow-y-auto">
+                    {(cityOptionsWithLabels.length > 0 ? cityOptionsWithLabels : CITY_OPTIONS_WITH_LABELS).map((option) => (
                       <button
                         key={option.value}
                         type="button"
@@ -410,10 +442,12 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                   {(() => {
                     const searchQuery = formData.area.toLowerCase().trim();
-                    const filteredAreas = AREA_OPTIONS.filter(area =>
+                    // Use dynamic areas if available, otherwise fallback to static AREA_OPTIONS
+                    const availableAreas = areas.length > 0 ? areas : AREA_OPTIONS;
+                    const filteredAreas = availableAreas.filter(area =>
                       area.toLowerCase().includes(searchQuery)
                     );
-                    const exactMatch = AREA_OPTIONS.some(area => 
+                    const exactMatch = availableAreas.some(area => 
                       area.toLowerCase() === searchQuery
                     );
                     const showAddNew = searchQuery.length > 0 && !exactMatch;

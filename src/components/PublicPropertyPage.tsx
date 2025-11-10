@@ -301,19 +301,23 @@ export function PublicPropertyPage() {
               </div>
             )}
 
-            {/* Location */}
-            {locationCoords && (
+            {/* Landmark Location - only show landmark, not exact location */}
+            {(property.landmark_location || property.landmark_location_distance) && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Location</h3>
-                <button
-                  onClick={handleOpenInMap}
-                  className="w-full px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 text-blue-700 font-medium"
-                >
-                  <Navigation className="w-5 h-5" />
-                  Open in Google Maps
-                </button>
-                {property.location_accuracy && (
-                  <p className="text-sm text-gray-600 mt-2">Accuracy: {property.location_accuracy}</p>
+                {property.landmark_location && (
+                  <div className="mb-2">
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <MapPin className="w-4 h-4 text-gray-500" />
+                      <span className="text-base font-medium">{property.landmark_location}</span>
+                    </div>
+                  </div>
+                )}
+                {property.landmark_location_distance && (
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Navigation className="w-4 h-4" />
+                    <span className="text-sm">{property.landmark_location_distance} away</span>
+                  </div>
                 )}
               </div>
             )}

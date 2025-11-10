@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, Lock, Globe, Navigation, Satellite, Map as MapIcon } from 'lucide-react';
 import { Property } from '../types/property';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, Polyline } from 'react-leaflet';
@@ -41,7 +41,7 @@ function TileLayerSwitcher({ isSatelliteView }: { isSatelliteView: boolean }) {
 }
 
 // Component to update map bounds to show property, landmark, and user location
-function MapBoundsUpdater({ propertyLocation, landmarkLocation, userLocation, hasUserLocation, isInitialLoad }: { propertyLocation: [number, number]; landmarkLocation: [number, number] | null; userLocation: [number, number] | null; hasUserLocation: boolean; isInitialLoad: boolean }) {
+function MapBoundsUpdater({ propertyLocation, landmarkLocation, userLocation, hasUserLocation, isInitialLoad, shouldUpdateBounds }: { propertyLocation: [number, number]; landmarkLocation: [number, number] | null; userLocation: [number, number] | null; hasUserLocation: boolean; isInitialLoad: boolean; shouldUpdateBounds: boolean }) {
   const map = useMap();
   
   useEffect(() => {
@@ -61,7 +61,7 @@ function MapBoundsUpdater({ propertyLocation, landmarkLocation, userLocation, ha
       setTimeout(invalidateSize, 500),
     ];
     
-    if (isInitialLoad) {
+    if (isInitialLoad || shouldUpdateBounds) {
       const updateBounds = () => {
         try {
           const locationsToFit: [number, number][] = [propertyLocation];
@@ -86,13 +86,13 @@ function MapBoundsUpdater({ propertyLocation, landmarkLocation, userLocation, ha
         }
       };
       
-      setTimeout(updateBounds, 400);
+      setTimeout(updateBounds, isInitialLoad ? 400 : 100);
     }
 
     return () => {
       timers.forEach(timer => clearTimeout(timer));
     };
-  }, [propertyLocation, landmarkLocation, userLocation, hasUserLocation, isInitialLoad, map]);
+  }, [propertyLocation, landmarkLocation, userLocation, hasUserLocation, isInitialLoad, shouldUpdateBounds, map]);
   
   return null;
 }
@@ -118,6 +118,56 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [shouldUpdateBounds, setShouldUpdateBounds] = useState(false);
+  
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setIsGettingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setUserLocation([lat, lng]);
+        setIsGettingLocation(false);
+        setIsInitialLoad(false);
+        setShouldUpdateBounds(true);
+        
+        // Reset the flag after a short delay
+        setTimeout(() => {
+          setShouldUpdateBounds(false);
+        }, 500);
+      },
+      (error) => {
+        setIsGettingLocation(false);
+        let errorMessage = 'Failed to get your location. ';
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Please allow location access in your browser settings.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information is unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out.';
+            break;
+          default:
+            errorMessage += 'An unknown error occurred.';
+            break;
+        }
+        alert(errorMessage);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
   
   const mapCenter: [number, number] = (() => {
     if (landmarkLocationCoords) {
@@ -186,7 +236,11 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
         const lng = position.coords.longitude;
         setUserLocation([lat, lng]);
         setIsGettingLocation(false);
-        setTimeout(() => setIsInitialLoad(false), 500);
+        setShouldUpdateBounds(true);
+        setTimeout(() => {
+          setIsInitialLoad(false);
+          setShouldUpdateBounds(false);
+        }, 500);
       },
       (error) => {
         clearTimeout(timeoutId);
@@ -291,6 +345,7 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
                   userLocation={userLocation}
                   hasUserLocation={!!userLocation}
                   isInitialLoad={isInitialLoad}
+                  shouldUpdateBounds={shouldUpdateBounds}
                 />
                 <TileLayerSwitcher isSatelliteView={isSatelliteView} />
                 
@@ -390,6 +445,7 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
             </MapContainer>
             
             <div className="absolute inset-0 pointer-events-none z-[10]" style={{ pointerEvents: 'none' }}>
+              {/* Satellite View Toggle Button - Top Right */}
               <button
                 type="button"
                 onClick={() => {
@@ -418,6 +474,20 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
                   strokeWidth={2.5}
                 />
                 <span className="hidden sm:inline">{isSatelliteView ? 'Satellite' : 'Map'}</span>
+              </button>
+              
+              {/* GPS/Current Location Button - Bottom Right */}
+              <button
+                type="button"
+                onClick={handleGetCurrentLocation}
+                disabled={isGettingLocation}
+                className="absolute bottom-2 right-2 pointer-events-auto flex items-center justify-center w-10 h-10 bg-white text-blue-600 hover:bg-blue-50 rounded-lg shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
+                title="Get Current Location"
+              >
+                <Navigation 
+                  className={`w-5 h-5 flex-shrink-0 ${isGettingLocation ? 'animate-spin' : ''}`} 
+                  strokeWidth={2.5}
+                />
               </button>
             </div>
           </div>

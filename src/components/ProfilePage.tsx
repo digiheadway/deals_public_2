@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, LogOut, User, CheckCircle2, Lock } from 'lucide-react';
+import { ArrowLeft, Save, LogOut, User, CheckCircle2, Lock, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { CITY_OPTIONS, AREA_OPTIONS, PROPERTY_TYPES } from '../utils/filterOptions';
 import { authApi } from '../services/authApi';
 import { setCurrentUser } from '../types/user';
 import { PasswordChangeModal } from './PasswordChangeModal';
+import { clearAreaCityCache } from '../utils/areaCityApi';
 
 interface ProfilePageProps {
   onBack: () => void;
@@ -78,6 +79,7 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
   const [loading, setLoading] = useState(!user);
   const [error, setError] = useState('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [cacheCleared, setCacheCleared] = useState(false);
   const cityCoversDropdownRef = useRef<HTMLDivElement>(null);
   const areaCoversDropdownRef = useRef<HTMLDivElement>(null);
   const dealsInDropdownRef = useRef<HTMLDivElement>(null);
@@ -300,6 +302,12 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
 
   const getArrayItems = (value: string): string[] => {
     return value ? value.split(',').map(i => i.trim()).filter(i => i) : [];
+  };
+
+  const handleClearCache = () => {
+    clearAreaCityCache();
+    setCacheCleared(true);
+    setTimeout(() => setCacheCleared(false), 3000);
   };
 
   return (
@@ -718,6 +726,22 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
             {/* Change Password and Logout Section */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
               <div className="p-4 space-y-3">
+                {/* Clear Cache Button */}
+                <button
+                  type="button"
+                  onClick={handleClearCache}
+                  className="w-full px-4 py-2.5 bg-white border border-orange-200 rounded-lg font-medium hover:border-orange-400 hover:bg-orange-50 transition-all duration-200 flex items-center justify-center gap-2 text-orange-600 hover:text-orange-700 text-sm"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear Area/City Cache
+                </button>
+                {cacheCleared && (
+                  <div className="flex items-center justify-center gap-2 text-green-600 font-medium text-sm">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <p>Cache cleared successfully!</p>
+                  </div>
+                )}
+
                 {/* Password Change Button */}
                 <button
                   type="button"
