@@ -194,7 +194,7 @@ export function PropertyCard({
 
       {/* Created date and Public/Private icon in bottom right */}
       <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 flex items-center gap-1.5 sm:gap-2">
-        <span className={`text-xs ${typeStyles.iconColor} opacity-60`}>
+        <span className={`text-[0.65rem] ${typeStyles.iconColor} opacity-60`}>
           {createdDateText}
         </span>
         {isOwned && (
