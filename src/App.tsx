@@ -272,6 +272,40 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, ownerId, location.pathname]); // Only run once when authenticated
 
+  // Handle property links for logged-in users - open in modal instead of public page
+  useEffect(() => {
+    const handlePropertyLink = async () => {
+      // Only handle if user is authenticated and on property route
+      if (!isAuthenticated || !ownerId || !location.pathname.startsWith('/property/')) {
+        return;
+      }
+
+      const propertyIdMatch = location.pathname.match(/^\/property\/(\d+)$/);
+      if (!propertyIdMatch) return;
+
+      const propertyId = parseInt(propertyIdMatch[1]);
+      if (isNaN(propertyId)) return;
+
+      try {
+        // Fetch the property
+        const property = await propertyApi.getPropertyById(propertyId);
+        
+        if (property && property.is_public === 1) {
+          // Set property and open modal
+          setSelectedProperty(property);
+          setShowDetailsModal(true);
+          // Navigate to home to show the modal in the main app context
+          navigate('/home', { replace: true });
+        }
+      } catch (error) {
+        console.error('Failed to load property for logged-in user:', error);
+        // If error, let it fall through to show public page
+      }
+    };
+
+    handlePropertyLink();
+  }, [isAuthenticated, ownerId, location.pathname, navigate]);
+
   // Re-apply filters after properties are loaded (fixes issue where filters applied before properties load)
   // NOTE: This is now mostly redundant since we handle filters/search on initial load
   // Keeping it as a safety net but with stricter guards to prevent duplicate calls
@@ -798,8 +832,28 @@ function App() {
   };
 
   const handleAskQuestion = (property: Property) => {
-    setSelectedProperty(property);
-    setShowContactModal(true);
+    if (!property.owner_phone) {
+      showToast('Owner phone number not available', 'error');
+      return;
+    }
+
+    // Remove any non-digit characters except + for international format
+    const phoneNumber = property.owner_phone.replace(/[^\d+]/g, '');
+    
+    // Create property link
+    const propertyLink = `${window.location.origin}/property/${property.id}`;
+    
+    // Create message with property details and link
+    const sizeText = property.min_size === property.size_max
+      ? `${property.min_size} ${property.size_unit}`
+      : `${property.min_size}-${property.size_max} ${property.size_unit}`;
+    const priceText = formatPriceWithLabel(property.price_min, property.price_max);
+    
+    const message = `Hi, I'm interested in this property:\n\n${property.type} in ${property.area}, ${property.city}\n${property.description ? property.description + '\n' : ''}Size: ${sizeText}\nPrice: ${priceText}\n\nView property: ${propertyLink}`;
+    
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+    showToast('Opening WhatsApp...', 'success');
   };
 
   const handleContactSubmit = async (_message: string, _phone: string) => {

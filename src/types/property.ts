@@ -22,6 +22,9 @@ export interface Property {
   updated_on?: string;
   tags?: string;
   highlights?: string;
+  owner_name?: string;
+  owner_phone?: string;
+  owner_firm_name?: string;
 }
 
 export interface PropertyFormData {

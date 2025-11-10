@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, Copy, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapPin, FileText, Sparkles, Tag, Lock, Globe, ChevronDown, Star, Building, CornerDownRight, Navigation, Shield, Wifi, Calendar, AlertCircle, TreePine, Home, TrendingUp, DollarSign, Info } from 'lucide-react';
+import { X, Copy, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapPin, FileText, Sparkles, Tag, Lock, Globe, ChevronDown, Star, Building, CornerDownRight, Navigation, Shield, Wifi, Calendar, AlertCircle, TreePine, Home, TrendingUp, DollarSign, Info, Phone, User } from 'lucide-react';
 import { Property } from '../types/property';
 import { formatPrice, formatPriceWithLabel } from '../utils/priceFormatter';
 import { HIGHLIGHT_OPTIONS, TAG_OPTIONS } from '../utils/filterOptions';
 import { LocationModal } from './LocationModal';
 import { LocationViewModal } from './LocationViewModal';
+import { OwnerDetailsModal } from './OwnerDetailsModal';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 
 interface PropertyDetailsModalProps {
@@ -102,6 +103,7 @@ export function PropertyDetailsModal({
   const [showTagModal, setShowTagModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showLocationViewModal, setShowLocationViewModal] = useState(false);
+  const [showOwnerDetailsModal, setShowOwnerDetailsModal] = useState(false);
   const [showNoteTooltip, setShowNoteTooltip] = useState(false);
   const [showPrivacyInfoTooltip, setShowPrivacyInfoTooltip] = useState(false);
   const [showLocationInfoTooltip, setShowLocationInfoTooltip] = useState(false);
@@ -356,6 +358,23 @@ export function PropertyDetailsModal({
                 </span>
               </div>
             </div>
+            {!isOwned && property.owner_firm_name && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm sm:text-base text-gray-600">Listed By</span>
+                </div>
+                <div className="text-right">
+                  <button
+                    onClick={() => setShowOwnerDetailsModal(true)}
+                    className="text-sm sm:text-base font-semibold text-gray-900 border-b border-dotted border-gray-900 hover:border-gray-700 transition-colors cursor-pointer"
+                    style={{ borderBottomWidth: '1.5px' }}
+                  >
+                    {property.owner_firm_name}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {property.description && (
@@ -580,16 +599,28 @@ export function PropertyDetailsModal({
               </>
             ) : (
               <>
-                <button
-                  onClick={() => {
-                    onAskQuestion?.(property);
-                  }}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-center gap-1.5 sm:gap-2 bg-green-600 text-white text-xs sm:text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  Ask a Question
-                </button>
-              
+                <div className="flex gap-2 sm:gap-3">
+                  <button
+                    onClick={() => {
+                      onAskQuestion?.(property);
+                    }}
+                    className="flex-1 px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-center gap-1.5 sm:gap-2 bg-green-600 text-white text-xs sm:text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    Ask Question
+                  </button>
+                  {property.owner_phone && (
+                    <button
+                      onClick={() => {
+                        window.location.href = `tel:${property.owner_phone}`;
+                      }}
+                      className="flex-1 px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-center gap-1.5 sm:gap-2 bg-blue-600 text-white text-xs sm:text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      Call
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -934,6 +965,13 @@ export function PropertyDetailsModal({
           property={property}
           onClose={() => setShowLocationViewModal(false)}
           onOpenInGoogleMaps={handleOpenInGoogleMaps}
+        />
+      )}
+
+      {showOwnerDetailsModal && (
+        <OwnerDetailsModal
+          property={property}
+          onClose={() => setShowOwnerDetailsModal(false)}
         />
       )}
 
