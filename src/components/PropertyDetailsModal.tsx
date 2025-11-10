@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X, Copy, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapPin, FileText, Sparkles, Tag, Lock, Globe, ChevronDown, Star, Building, CornerDownRight, Navigation, Shield, Wifi, Calendar, AlertCircle, TreePine, Home, TrendingUp, DollarSign, Info, Phone, User } from 'lucide-react';
+import { X, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapPin, FileText, Sparkles, Tag, Lock, Globe, ChevronDown, Star, Building, CornerDownRight, Navigation, Shield, Wifi, Calendar, AlertCircle, TreePine, Home, TrendingUp, DollarSign, Info, Phone, User } from 'lucide-react';
 import { Property } from '../types/property';
-import { formatPrice, formatPriceWithLabel } from '../utils/priceFormatter';
+import { formatPrice } from '../utils/priceFormatter';
 import { formatSize } from '../utils/sizeFormatter';
 import { HIGHLIGHT_OPTIONS, TAG_OPTIONS } from '../utils/filterOptions';
 import { LocationModal } from './LocationModal';
 import { LocationViewModal } from './LocationViewModal';
 import { OwnerDetailsModal } from './OwnerDetailsModal';
+import { ShareModal } from './ShareModal';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 
 interface PropertyDetailsModalProps {
@@ -98,13 +99,13 @@ export function PropertyDetailsModal({
   onUpdateLandmarkLocation,
 }: PropertyDetailsModalProps) {
   const highlightStyles = getHighlightStyles(property.type);
-  const [copied, setCopied] = useState(false);
   const [copiedLocation, setCopiedLocation] = useState(false);
   const [showHighlightModal, setShowHighlightModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showLocationViewModal, setShowLocationViewModal] = useState(false);
   const [showOwnerDetailsModal, setShowOwnerDetailsModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [showNoteTooltip, setShowNoteTooltip] = useState(false);
   const [showPrivacyInfoTooltip, setShowPrivacyInfoTooltip] = useState(false);
   const [showLocationInfoTooltip, setShowLocationInfoTooltip] = useState(false);
@@ -172,15 +173,6 @@ export function PropertyDetailsModal({
     }
   }, [showTagModal]);
 
-  const handleCopy = () => {
-    const sizeText = formatSize(property.min_size, property.size_max, property.size_unit);
-    const priceText = formatPriceWithLabel(property.price_min, property.price_max);
-    const text = `${property.type} in ${property.area}, ${property.city}\n${property.description}\nSize: ${sizeText}\nPrice: ${priceText}`;
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const toggleHighlight = (highlight: string) => {
     setSelectedHighlights(prev =>
       prev.includes(highlight)
@@ -233,7 +225,16 @@ export function PropertyDetailsModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 mobile-modal-container">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl mobile-modal-content sm:max-h-[90vh] overflow-y-auto animate-slide-up">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{property.type} #{property.id}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{property.type} #{property.id}</h2>
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full transition-colors"
+              title="Share property"
+            >
+              <Share2 className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+            </button>
+          </div>
           <button
             onClick={onClose}
             className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -564,38 +565,6 @@ export function PropertyDetailsModal({
             </div>
           )}
 
-     <div className="pt-2 border-t border-gray-200">
-                  <p className="text-xs font-semibold text-gray-600 uppercase mb-2">Share</p>
-                  <div className={`grid gap-2 sm:gap-3 ${hasLocation && isOwned ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                    <button
-                      onClick={handleCopy}
-                      className="px-2 sm:px-3 py-2 sm:py-3 flex items-center justify-center gap-1 sm:gap-1.5 bg-gray-100 text-gray-700 text-xs sm:text-sm font-semibold rounded-lg hover:bg-gray-200 transition-colors"
-                    >
-                      <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
-                    </button>
-                    {hasLocation && isOwned && (
-                      <button
-                        onClick={handleCopyLocation}
-                        className="px-2 sm:px-3 py-2 sm:py-3 flex items-center justify-center gap-1 sm:gap-1.5 bg-gray-100 text-gray-700 text-xs sm:text-sm font-semibold rounded-lg hover:bg-gray-200 transition-colors"
-                        title="Copy location coordinates"
-                      >
-                        <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span className="hidden sm:inline">{copiedLocation ? 'Copied' : 'Location'}</span>
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        onShare?.(property);
-                        onClose();
-                      }}
-                      className="px-2 sm:px-3 py-2 sm:py-3 flex items-center justify-center gap-1 sm:gap-1.5 bg-gray-100 text-gray-700 text-xs sm:text-sm font-semibold rounded-lg hover:bg-gray-200 transition-colors"
-                    >
-                      <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      <span className="hidden sm:inline">Share</span>
-                    </button>
-                  </div>
-                </div>
           <div className="pt-4 sm:pt-6 border-t border-gray-200 space-y-2 sm:space-y-3">
             {isOwned ? (
               <>
@@ -1002,6 +971,14 @@ export function PropertyDetailsModal({
         <OwnerDetailsModal
           property={property}
           onClose={() => setShowOwnerDetailsModal(false)}
+        />
+      )}
+
+      {showShareModal && (
+        <ShareModal
+          property={property}
+          isOwned={isOwned}
+          onClose={() => setShowShareModal(false)}
         />
       )}
 
