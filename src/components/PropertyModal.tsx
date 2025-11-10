@@ -108,9 +108,9 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
       public_rating: property.public_rating || 0,
       my_rating: property.my_rating || 0,
     } : (draftData || {
-      // Priority: last selections > user defaults > userSettings > fallback
+      // Priority: user defaults > userSettings > fallback
       city: getLastSelections.city || getUserDefaultCity() || userSettings.city || 'Panipat',
-      area: getLastSelections.area || getDefaultArea() || (userSettings.preferredAreas.length > 0 ? userSettings.preferredAreas[0] : ''),
+      area: getDefaultArea() || (userSettings.preferredAreas.length > 0 ? userSettings.preferredAreas[0] : ''),
       type: getDefaultType() || (userSettings.preferredPropertyTypes.length > 0 ? userSettings.preferredPropertyTypes[0] : ''),
       description: '',
       note_private: '',
