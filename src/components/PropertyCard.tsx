@@ -2,6 +2,7 @@ import { Globe, Lock, Ruler, IndianRupee, MapPin, Sparkles, Tag, Star, Building,
 import { Property } from '../types/property';
 import { getUserSettings } from '../types/userSettings';
 import { formatPrice } from '../utils/priceFormatter';
+import { formatSize } from '../utils/sizeFormatter';
 
 interface PropertyCardProps {
   property: Property;
@@ -92,9 +93,7 @@ export function PropertyCard({
   const priceText = formatPrice(property.price_min, property.price_max);
   
   // Format size
-  const sizeText = property.min_size === property.size_max
-    ? `${property.min_size} ${property.size_unit}`
-    : `${property.min_size}-${property.size_max} ${property.size_unit}`;
+  const sizeText = formatSize(property.min_size, property.size_max, property.size_unit);
   
   // Format location - show city only if it's not the user's city
   const locationText = property.city.toLowerCase() === userCity.toLowerCase()

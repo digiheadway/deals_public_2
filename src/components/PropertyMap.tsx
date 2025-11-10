@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import { Property } from '../types/property';
 import { formatPrice } from '../utils/priceFormatter';
+import { formatSize } from '../utils/sizeFormatter';
 import { Navigation, Satellite } from 'lucide-react';
 import L from 'leaflet';
 
@@ -166,7 +167,7 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
                       {formatPrice(property.price_min, property.price_max, true)}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {property.min_size}-{property.size_max} {property.size_unit}
+                      {formatSize(property.min_size, property.size_max, property.size_unit)}
                     </p>
                     {property.location_accuracy && (
                       <p className="text-xs text-blue-600 mt-0.5">

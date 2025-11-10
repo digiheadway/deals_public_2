@@ -6,27 +6,65 @@
  * @returns Formatted price string
  */
 export function formatPrice(
-  minPrice: number,
-  maxPrice: number,
+  minPrice: number | undefined | null,
+  maxPrice: number | undefined | null,
   includeRupeeSymbol: boolean = false
 ): string {
-  const useCrores = minPrice >= 100;
   const symbol = includeRupeeSymbol ? '₹' : '';
 
+  // Convert to numbers and handle NaN, undefined, null
+  const min = Number(minPrice) || 0;
+  const max = Number(maxPrice) || 0;
+
+  // Check for NaN
+  if (isNaN(min) || isNaN(max)) {
+    return '';
+  }
+
+  // If both are 0, return 0
+  if (min === 0 && max === 0) {
+    return `${symbol}0`;
+  }
+
+  // If they're the same, show only one value
+  if (min === max) {
+    const useCrores = min >= 100;
+    if (useCrores) {
+      const priceCr = (min / 100).toFixed(2).replace(/\.?0+$/, '');
+      return `${symbol}${priceCr} Cr`;
+    } else {
+      return `${symbol}${min} Lakh`;
+    }
+  }
+
+  // If one is 0, show only the non-zero value
+  if (min === 0) {
+    const useCrores = max >= 100;
+    if (useCrores) {
+      const priceCr = (max / 100).toFixed(2).replace(/\.?0+$/, '');
+      return `${symbol}${priceCr} Cr`;
+    } else {
+      return `${symbol}${max} Lakh`;
+    }
+  }
+  if (max === 0) {
+    const useCrores = min >= 100;
+    if (useCrores) {
+      const priceCr = (min / 100).toFixed(2).replace(/\.?0+$/, '');
+      return `${symbol}${priceCr} Cr`;
+    } else {
+      return `${symbol}${min} Lakh`;
+    }
+  }
+
+  // Otherwise, show range
+  const useCrores = min >= 100;
   if (useCrores) {
-    const minCr = (minPrice / 100).toFixed(2).replace(/\.?0+$/, '');
-    if (minPrice === maxPrice) {
-      return `${symbol}${minCr} Cr`;
-    } else {
-      const maxCr = (maxPrice / 100).toFixed(2).replace(/\.?0+$/, '');
-      return `${symbol}${minCr}-${maxCr} Cr`;
-    }
+    const minCr = (min / 100).toFixed(2).replace(/\.?0+$/, '');
+    const maxCr = (max / 100).toFixed(2).replace(/\.?0+$/, '');
+    return `${symbol}${minCr}-${maxCr} Cr`;
   } else {
-    if (minPrice === maxPrice) {
-      return `${symbol}${minPrice} Lakh`;
-    } else {
-      return `${symbol}${minPrice}-${maxPrice} Lakh`;
-    }
+    return `${symbol}${min}-${max} Lakh`;
   }
 }
 
@@ -37,25 +75,62 @@ export function formatPrice(
  * @returns Formatted price string with unit label
  */
 export function formatPriceWithLabel(
-  minPrice: number,
-  maxPrice: number
+  minPrice: number | undefined | null,
+  maxPrice: number | undefined | null
 ): string {
-  const useCrores = minPrice >= 100;
+  // Convert to numbers and handle NaN, undefined, null
+  const min = Number(minPrice) || 0;
+  const max = Number(maxPrice) || 0;
 
+  // Check for NaN
+  if (isNaN(min) || isNaN(max)) {
+    return '';
+  }
+
+  // If both are 0, return 0
+  if (min === 0 && max === 0) {
+    return '₹0';
+  }
+
+  // If they're the same, show only one value
+  if (min === max) {
+    const useCrores = min >= 100;
+    if (useCrores) {
+      const priceCr = (min / 100).toFixed(2).replace(/\.?0+$/, '');
+      return `₹${priceCr} Crores`;
+    } else {
+      return `₹${min} Lakhs`;
+    }
+  }
+
+  // If one is 0, show only the non-zero value
+  if (min === 0) {
+    const useCrores = max >= 100;
+    if (useCrores) {
+      const priceCr = (max / 100).toFixed(2).replace(/\.?0+$/, '');
+      return `₹${priceCr} Crores`;
+    } else {
+      return `₹${max} Lakhs`;
+    }
+  }
+  if (max === 0) {
+    const useCrores = min >= 100;
+    if (useCrores) {
+      const priceCr = (min / 100).toFixed(2).replace(/\.?0+$/, '');
+      return `₹${priceCr} Crores`;
+    } else {
+      return `₹${min} Lakhs`;
+    }
+  }
+
+  // Otherwise, show range
+  const useCrores = min >= 100;
   if (useCrores) {
-    const minCr = (minPrice / 100).toFixed(2).replace(/\.?0+$/, '');
-    if (minPrice === maxPrice) {
-      return `₹${minCr} Crores`;
-    } else {
-      const maxCr = (maxPrice / 100).toFixed(2).replace(/\.?0+$/, '');
-      return `₹${minCr}-${maxCr} Crores`;
-    }
+    const minCr = (min / 100).toFixed(2).replace(/\.?0+$/, '');
+    const maxCr = (max / 100).toFixed(2).replace(/\.?0+$/, '');
+    return `₹${minCr}-${maxCr} Crores`;
   } else {
-    if (minPrice === maxPrice) {
-      return `₹${minPrice} Lakhs`;
-    } else {
-      return `₹${minPrice}-${maxPrice} Lakhs`;
-    }
+    return `₹${min}-${max} Lakhs`;
   }
 }
 

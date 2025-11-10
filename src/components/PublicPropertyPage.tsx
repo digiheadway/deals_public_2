@@ -4,6 +4,7 @@ import { ArrowLeft, MapPin, Ruler, IndianRupee, Home, Share2, MessageCircle, Bui
 import { Property } from '../types/property';
 import { propertyApi } from '../services/api';
 import { formatPrice, formatPriceWithLabel } from '../utils/priceFormatter';
+import { formatSize } from '../utils/sizeFormatter';
 import { HIGHLIGHT_OPTIONS } from '../utils/filterOptions';
 
 export function PublicPropertyPage() {
@@ -70,9 +71,7 @@ export function PublicPropertyPage() {
 
   const handleShare = () => {
     if (navigator.share && property) {
-      const sizeText = property.min_size === property.size_max
-        ? `${property.min_size} ${property.size_unit}`
-        : `${property.min_size}-${property.size_max} ${property.size_unit}`;
+      const sizeText = formatSize(property.min_size, property.size_max, property.size_unit);
       const priceText = formatPriceWithLabel(property.price_min, property.price_max);
       const text = `${property.type} in ${property.area}, ${property.city}\n${property.description}\nSize: ${sizeText}\nPrice: ${priceText}`;
 
@@ -225,40 +224,46 @@ export function PublicPropertyPage() {
 
             {/* Key Details Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-gray-600 mb-1">
-                  <Ruler className="w-4 h-4" />
-                  <span className="text-xs font-medium">Size</span>
+              {(property.min_size > 0 || property.size_max > 0) && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <Ruler className="w-4 h-4" />
+                    <span className="text-xs font-medium">Size</span>
+                  </div>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {formatSize(property.min_size, property.size_max, property.size_unit)}
+                  </p>
                 </div>
-                <p className="text-lg font-semibold text-gray-900">
-                  {property.min_size === property.size_max
-                    ? `${property.min_size} ${property.size_unit}`
-                    : `${property.min_size}-${property.size_max} ${property.size_unit}`}
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-gray-600 mb-1">
-                  <IndianRupee className="w-4 h-4" />
-                  <span className="text-xs font-medium">Price</span>
+              )}
+              {(property.price_min > 0 || property.price_max > 0) && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <IndianRupee className="w-4 h-4" />
+                    <span className="text-xs font-medium">Price</span>
+                  </div>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {formatPriceWithLabel(property.price_min, property.price_max)}
+                  </p>
                 </div>
-                <p className="text-lg font-semibold text-gray-900">
-                  {formatPriceWithLabel(property.price_min, property.price_max)}
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-gray-600 mb-1">
-                  <MapPin className="w-4 h-4" />
-                  <span className="text-xs font-medium">Area</span>
+              )}
+              {property.area && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <MapPin className="w-4 h-4" />
+                    <span className="text-xs font-medium">Area</span>
+                  </div>
+                  <p className="text-lg font-semibold text-gray-900">{property.area}</p>
                 </div>
-                <p className="text-lg font-semibold text-gray-900">{property.area}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-gray-600 mb-1">
-                  <Building className="w-4 h-4" />
-                  <span className="text-xs font-medium">City</span>
+              )}
+              {property.city && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <Building className="w-4 h-4" />
+                    <span className="text-xs font-medium">City</span>
+                  </div>
+                  <p className="text-lg font-semibold text-gray-900">{property.city}</p>
                 </div>
-                <p className="text-lg font-semibold text-gray-900">{property.city}</p>
-              </div>
+              )}
             </div>
 
             {/* Highlights */}

@@ -13,6 +13,7 @@ import { logoutUser, getCurrentUser } from './types/user';
 import { authApi } from './services/authApi';
 import { STORAGE_KEYS } from './utils/filterOptions';
 import { formatPriceWithLabel } from './utils/priceFormatter';
+import { formatSize } from './utils/sizeFormatter';
 
 // Lazy load heavy components
 const PropertyModal = lazy(() => import('./components/PropertyModal').then(m => ({ default: m.PropertyModal })));
@@ -644,9 +645,7 @@ function App() {
   };
 
   const handleShare = async (property: Property) => {
-    const sizeText = property.min_size === property.size_max
-      ? `${property.min_size} ${property.size_unit}`
-      : `${property.min_size}-${property.size_max} ${property.size_unit}`;
+    const sizeText = formatSize(property.min_size, property.size_max, property.size_unit);
     const priceText = formatPriceWithLabel(property.price_min, property.price_max);
     const shareUrl = property.is_public === 1 
       ? `${window.location.origin}/property/${property.id}`
@@ -844,9 +843,7 @@ function App() {
     const propertyLink = `${window.location.origin}/property/${property.id}`;
     
     // Create message with property details and link
-    const sizeText = property.min_size === property.size_max
-      ? `${property.min_size} ${property.size_unit}`
-      : `${property.min_size}-${property.size_max} ${property.size_unit}`;
+    const sizeText = formatSize(property.min_size, property.size_max, property.size_unit);
     const priceText = formatPriceWithLabel(property.price_min, property.price_max);
     
     const message = `Hi, I'm interested in this property:\n\n${property.type} in ${property.area}, ${property.city}\n${property.description ? property.description + '\n' : ''}Size: ${sizeText}\nPrice: ${priceText}\n\nView property: ${propertyLink}`;

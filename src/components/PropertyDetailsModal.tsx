@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Copy, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapPin, FileText, Sparkles, Tag, Lock, Globe, ChevronDown, Star, Building, CornerDownRight, Navigation, Shield, Wifi, Calendar, AlertCircle, TreePine, Home, TrendingUp, DollarSign, Info, Phone, User } from 'lucide-react';
 import { Property } from '../types/property';
 import { formatPrice, formatPriceWithLabel } from '../utils/priceFormatter';
+import { formatSize } from '../utils/sizeFormatter';
 import { HIGHLIGHT_OPTIONS, TAG_OPTIONS } from '../utils/filterOptions';
 import { LocationModal } from './LocationModal';
 import { LocationViewModal } from './LocationViewModal';
@@ -172,9 +173,7 @@ export function PropertyDetailsModal({
   }, [showTagModal]);
 
   const handleCopy = () => {
-    const sizeText = property.min_size === property.size_max
-      ? `${property.min_size} ${property.size_unit}`
-      : `${property.min_size}-${property.size_max} ${property.size_unit}`;
+    const sizeText = formatSize(property.min_size, property.size_max, property.size_unit);
     const priceText = formatPriceWithLabel(property.price_min, property.price_max);
     const text = `${property.type} in ${property.area}, ${property.city}\n${property.description}\nSize: ${sizeText}\nPrice: ${priceText}`;
     navigator.clipboard.writeText(text);
@@ -245,119 +244,126 @@ export function PropertyDetailsModal({
 
         <div className="p-4 sm:p-6 space-y-3 sm:space-y-4 md:space-y-6">
           <div className="space-y-3 sm:space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Ruler className="w-4 h-4 text-gray-500" />
-                <span className="text-sm sm:text-base text-gray-600">Size</span>
+            {(property.min_size > 0 || property.size_max > 0) && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Ruler className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm sm:text-base text-gray-600">Size</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm sm:text-base font-semibold text-gray-900">
+                    {formatSize(property.min_size, property.size_max, property.size_unit)}
+                  </span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-sm sm:text-base font-semibold text-gray-900">
-                  {property.min_size === property.size_max
-                    ? property.min_size
-                    : `${property.min_size}-${property.size_max}`}
-                  <span className="text-sm sm:text-base text-gray-700"> {property.size_unit}</span>
-                </span>
+            )}
+            {(property.price_min > 0 || property.price_max > 0) && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <IndianRupee className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm sm:text-base text-gray-600">Price</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm sm:text-base font-semibold text-gray-900">
+                    {formatPrice(property.price_min, property.price_max, true)}
+                  </span>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <IndianRupee className="w-4 h-4 text-gray-500" />
-                <span className="text-sm sm:text-base text-gray-600">Price</span>
+            )}
+            {property.area && property.city && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Building className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm sm:text-base text-gray-600" >Area</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm sm:text-base font-semibold text-gray-900">
+                    {property.area}, {property.city}
+                  </span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-sm sm:text-base font-semibold text-gray-900">
-                  {formatPrice(property.price_min, property.price_max, true)}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Building className="w-4 h-4 text-gray-500" />
-                <span className="text-sm sm:text-base text-gray-600" >Area</span>
-              </div>
-              <div className="text-right">
-                <span className="text-sm sm:text-base font-semibold text-gray-900">
-                  {property.area}, {property.city}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-gray-500" />
-                <span className="text-sm sm:text-base text-gray-600" >Location</span>
-                <div className="relative">
-                  <button
-                    onMouseEnter={() => setShowLocationInfoTooltip(true)}
-                    onMouseLeave={() => setShowLocationInfoTooltip(false)}
-                    onClick={() => setShowLocationInfoTooltip(!showLocationInfoTooltip)}
-                    className="p-0.5 hover:bg-gray-100 rounded transition-colors"
-                  >
-                    <Info className="w-3.5 h-3.5 text-gray-400" />
-                  </button>
-                  {showLocationInfoTooltip && (
-                    <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded z-50 pointer-events-none min-w-[200px] sm:min-w-[250px] max-w-[280px] sm:max-w-[320px]">
-                      {hasLocation 
-                        ? 'Exact location will not be shown to public even if you share the property to public. only the landmark location will be shown.' 
-                        : 'Exact location will not be shown to public even if you share the property to public. only the landmark location will be shown.'}
-                      <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-gray-900"></div>
-                    </div>
+            )}
+            {(hasLocation || isOwned) && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm sm:text-base text-gray-600" >Location</span>
+                  <div className="relative">
+                    <button
+                      onMouseEnter={() => setShowLocationInfoTooltip(true)}
+                      onMouseLeave={() => setShowLocationInfoTooltip(false)}
+                      onClick={() => setShowLocationInfoTooltip(!showLocationInfoTooltip)}
+                      className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      <Info className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                    {showLocationInfoTooltip && (
+                      <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded z-50 pointer-events-none min-w-[200px] sm:min-w-[250px] max-w-[280px] sm:max-w-[320px]">
+                        {hasLocation 
+                          ? 'Exact location will not be shown to public even if you share the property to public. only the landmark location will be shown.' 
+                          : 'Exact location will not be shown to public even if you share the property to public. only the landmark location will be shown.'}
+                        <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right flex items-center gap-2 flex-wrap justify-end">
+                  {hasLocation ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          if (locationCoords) {
+                            setShowLocationViewModal(true);
+                          }
+                        }}
+                        className="text-sm sm:text-base font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                      >
+                        <Navigation className="w-4 h-4" />
+                        Open
+                      </button>
+                      {isOwned && (
+                        <button
+                          onClick={() => setShowLocationModal(true)}
+                          className="text-sm sm:text-base font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Edit
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {isOwned && (
+                        <button
+                          onClick={() => setShowLocationModal(true)}
+                          className="text-sm sm:text-base font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Location
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
-              <div className="text-right flex items-center gap-2 flex-wrap justify-end">
-                {hasLocation ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        if (locationCoords) {
-                          setShowLocationViewModal(true);
-                        }
-                      }}
-                      className="text-sm sm:text-base font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                    >
-                      <Navigation className="w-4 h-4" />
-                      Open
-                    </button>
-                    {isOwned && (
-                      <button
-                        onClick={() => setShowLocationModal(true)}
-                        className="text-sm sm:text-base font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                        Edit
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {isOwned && (
-                      <button
-                        onClick={() => setShowLocationModal(true)}
-                        className="text-sm sm:text-base font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add Location
-                      </button>
-                    )}
-                  </>
-                )}
+            )}
+            {property.created_on && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm sm:text-base text-gray-600" >Created on</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm sm:text-base font-semibold text-gray-900">
+                    {new Date(property.created_on).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'short', 
+                      day: 'numeric' 
+                    })}
+                  </span>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-500" />
-                <span className="text-sm sm:text-base text-gray-600" >Created on</span>
-              </div>
-              <div className="text-right">
-                <span className="text-sm sm:text-base font-semibold text-gray-900">
-                  {new Date(property.created_on).toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric' 
-                  })}
-                </span>
-              </div>
-            </div>
+            )}
             {!isOwned && property.owner_firm_name && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -389,48 +395,50 @@ export function PropertyDetailsModal({
             </div>
           )}
 
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs sm:text-sm text-gray-600 flex items-center gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-gray-500" />
-                Highlights
-              </h3>
-              {isOwned && (
-                <button
-                  onClick={() => setShowHighlightModal(true)}
-                  className="flex items-center gap-1 text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700"
-                >
-                  {selectedHighlights.length > 0 ? (
-                    "Manage"
-                  ) : (
-                    <>
-                      <Plus className="w-3.5 h-3.5 inline" /> Add
-                    </>
-                  )}
-                </button>
+          {(selectedHighlights.length > 0 || isOwned) && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs sm:text-sm text-gray-600 flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-gray-500" />
+                  Highlights
+                </h3>
+                {isOwned && (
+                  <button
+                    onClick={() => setShowHighlightModal(true)}
+                    className="flex items-center gap-1 text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    {selectedHighlights.length > 0 ? (
+                      "Manage"
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5 inline" /> Add
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              {selectedHighlights.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedHighlights.map((highlight, idx) => {
+                    const Icon = getHighlightIcon(highlight);
+                    return (
+                      <span
+                        key={idx}
+                        className={`px-2.5 py-1 ${highlightStyles.bgColor} ${highlightStyles.textColor} rounded-lg text-xs font-medium flex items-center gap-1.5`}
+                      >
+                        <Icon className="w-3 h-3" />
+                        {highlight}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                isOwned && (
+                  <p className="text-xs text-gray-500">Add key features of property</p>
+                )
               )}
             </div>
-            {selectedHighlights.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {selectedHighlights.map((highlight, idx) => {
-                  const Icon = getHighlightIcon(highlight);
-                  return (
-                    <span
-                      key={idx}
-                      className={`px-2.5 py-1 ${highlightStyles.bgColor} ${highlightStyles.textColor} rounded-lg text-xs font-medium flex items-center gap-1.5`}
-                    >
-                      <Icon className="w-3 h-3" />
-                      {highlight}
-                    </span>
-                  );
-                })}
-              </div>
-            ) : (
-              isOwned && (
-                <p className="text-xs text-gray-500">Add key features of property</p>
-              )
-            )}
-          </div>
+          )}
 
           {isOwned && (
             <div className="pt-2 border-t border-gray-200">
