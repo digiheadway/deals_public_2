@@ -902,21 +902,26 @@ function App() {
         }
         
         // If there's a search query, use search API with pagination
+        // Pass filters to search API so backend can handle filtering and sorting server-side
         if (query.trim()) {
-          const searchResponse = await propertyApi.searchProperties(ownerId, listParam, query, currentColumn, { page: normalizedPage, per_page: normalizedPerPage });
+          const searchResponse = await propertyApi.searchProperties(
+            ownerId, 
+            listParam, 
+            query, 
+            currentColumn, 
+            { page: normalizedPage, per_page: normalizedPerPage },
+            false, // forMap
+            Object.keys(activeFilters).length > 0 ? activeFilters : undefined // Pass filters to backend
+          );
           
           // Check again after async operation
           if (filterRequestIdRef.current !== currentFilterRequestId) {
             return; // Request cancelled
           }
           
-          // Apply additional filters if any
-          let filtered = searchResponse.data;
-          if (Object.keys(activeFilters).length > 0) {
-            filtered = applyClientSideFilters(searchResponse.data, activeFilters);
-          }
+          // Backend handles all filtering and sorting, so no client-side filtering needed
           // Always set filteredProperties, even if empty (to show "no results")
-          setFilteredProperties(filtered);
+          setFilteredProperties(searchResponse.data);
           setPaginationMeta(searchResponse.meta);
         } else if (Object.keys(activeFilters).length > 0) {
           // If only filters (no search), use filter API directly with pagination
@@ -1027,17 +1032,25 @@ function App() {
           return; // Request cancelled
         }
         
-        // If there's a search query, use search API and apply filters client-side
+        // If there's a search query, use search API with filters passed to backend
         if (searchQuery.trim()) {
-          const searchResponse = await propertyApi.searchProperties(ownerId, listParam, searchQuery, searchColumn, { page: normalizedPage, per_page: normalizedPerPage });
+          const searchResponse = await propertyApi.searchProperties(
+            ownerId, 
+            listParam, 
+            searchQuery, 
+            searchColumn, 
+            { page: normalizedPage, per_page: normalizedPerPage },
+            false, // forMap
+            Object.keys(filters).length > 0 ? filters : undefined // Pass filters to backend
+          );
           
           // Check again after async operation
           if (filterRequestIdRef.current !== currentFilterRequestId) {
             return; // Request cancelled
           }
           
-          const filtered = applyClientSideFilters(searchResponse.data, filters);
-          setFilteredProperties(filtered);
+          // Backend handles all filtering and sorting, so no client-side filtering needed
+          setFilteredProperties(searchResponse.data);
           setPaginationMeta(searchResponse.meta);
         } else {
           // If only filters (no search), use filter API directly with pagination

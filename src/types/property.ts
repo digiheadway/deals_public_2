@@ -52,19 +52,22 @@ export interface PropertyFormData {
 export interface FilterOptions {
   city?: string;
   area?: string;
-  type?: string;
+  type?: string | string[]; // Single or multiple property types
   min_price?: number;
   max_price?: number;
   size_min?: number;
   max_size?: number;
-  size_unit?: string;
+  size_unit?: string; // Size unit for size range filter
+  filter_size_unit?: string; // Filter by specific size unit (separate from size_unit)
   description?: string;
   note_private?: string;
   location?: string;
   location_accuracy?: string;
-  tags?: string;
-  highlights?: string;
+  tags?: string | string[]; // Single or multiple tags
+  highlights?: string | string[]; // Single or multiple highlights
   is_public?: number;
   has_location?: boolean; // Filter for properties with/without location (fetch.php supports this)
   has_landmark?: boolean; // Filter for properties with/without landmark (fetch.php supports this)
+  sortby?: 'id' | 'price' | 'size' | 'updated_on' | 'created_on'; // Sort by field
+  order?: 'ASC' | 'DESC'; // Sort order
 }

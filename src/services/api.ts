@@ -322,9 +322,34 @@ export const propertyApi = {
     // Map filter options to API parameters (fetch.php expects these directly)
     if (filters.city) queryParams.append('city', filters.city);
     if (filters.area) queryParams.append('area', filters.area);
-    if (filters.type) queryParams.append('type', filters.type);
-    if (filters.tags) queryParams.append('tags', filters.tags);
-    if (filters.highlights) queryParams.append('highlights', filters.highlights);
+    // Handle type as string or array (for multi-select)
+    if (filters.type) {
+      if (Array.isArray(filters.type)) {
+        // For multi-select, send as comma-separated or multiple parameters
+        // Backend may need to support IN clause, for now send comma-separated
+        queryParams.append('type', filters.type.join(','));
+      } else {
+        queryParams.append('type', filters.type);
+      }
+    }
+    // Handle tags as string or array (for multi-select)
+    if (filters.tags) {
+      if (Array.isArray(filters.tags)) {
+        // For multi-select tags, join with comma (backend uses LIKE so this should work)
+        queryParams.append('tags', filters.tags.join(','));
+      } else {
+        queryParams.append('tags', filters.tags);
+      }
+    }
+    // Handle highlights as string or array (for multi-select)
+    if (filters.highlights) {
+      if (Array.isArray(filters.highlights)) {
+        // For multi-select highlights, join with comma (backend uses LIKE so this should work)
+        queryParams.append('highlights', filters.highlights.join(','));
+      } else {
+        queryParams.append('highlights', filters.highlights);
+      }
+    }
     
     // Map price filters (fetch.php expects price_min/price_max)
     if (filters.min_price !== undefined) queryParams.append('min_price', filters.min_price.toString());
@@ -333,12 +358,16 @@ export const propertyApi = {
     // Map size filters (fetch.php expects size_min/max_size and size_unit)
     if (filters.size_min !== undefined) queryParams.append('min_size', filters.size_min.toString());
     if (filters.max_size !== undefined) queryParams.append('max_size', filters.max_size.toString());
-    if (filters.size_unit) queryParams.append('size_unit', filters.size_unit);
-    if (filters.size_unit) queryParams.append('filter_size_unit', filters.size_unit); // fetch.php also uses filter_size_unit
+    if (filters.size_unit) queryParams.append('size_unit', filters.size_unit); // Size unit for size range filter
+    if (filters.filter_size_unit) queryParams.append('filter_size_unit', filters.filter_size_unit); // Filter by specific size unit (separate from size_unit)
     
     // Map location filters
     if (filters.has_location !== undefined) queryParams.append('has_location', filters.has_location.toString());
     if (filters.has_landmark !== undefined) queryParams.append('has_landmark', filters.has_landmark.toString());
+
+    // Add sorting parameters
+    if (filters.sortby) queryParams.append('sortby', filters.sortby);
+    if (filters.order) queryParams.append('order', filters.order);
 
     // Add pagination parameters
     if (pagination?.page !== undefined) {
@@ -364,7 +393,7 @@ export const propertyApi = {
     return { data: properties, meta };
   },
 
-  async searchProperties(ownerId: number, list: 'mine' | 'others' | 'both', query: string, _column?: string, pagination?: PaginationOptions, forMap?: boolean): Promise<PaginatedResponse<Property>> {
+  async searchProperties(ownerId: number, list: 'mine' | 'others' | 'both', query: string, _column?: string, pagination?: PaginationOptions, forMap?: boolean, filters?: FilterOptions): Promise<PaginatedResponse<Property>> {
     validateOwnerId(ownerId);
     const queryParams = new URLSearchParams();
     queryParams.append('list', list); // fetch.php uses 'list' parameter
@@ -377,6 +406,46 @@ export const propertyApi = {
 
     // Note: fetch.php doesn't use column parameter, it searches across all fields
     // (city, area, type, description, highlights, heading)
+
+    // Apply filters if provided (for search with filters)
+    if (filters) {
+      if (filters.city) queryParams.append('city', filters.city);
+      if (filters.area) queryParams.append('area', filters.area);
+      // Handle type as string or array (for multi-select)
+      if (filters.type) {
+        if (Array.isArray(filters.type)) {
+          queryParams.append('type', filters.type.join(','));
+        } else {
+          queryParams.append('type', filters.type);
+        }
+      }
+      // Handle tags as string or array (for multi-select)
+      if (filters.tags) {
+        if (Array.isArray(filters.tags)) {
+          queryParams.append('tags', filters.tags.join(','));
+        } else {
+          queryParams.append('tags', filters.tags);
+        }
+      }
+      // Handle highlights as string or array (for multi-select)
+      if (filters.highlights) {
+        if (Array.isArray(filters.highlights)) {
+          queryParams.append('highlights', filters.highlights.join(','));
+        } else {
+          queryParams.append('highlights', filters.highlights);
+        }
+      }
+      if (filters.min_price !== undefined) queryParams.append('min_price', filters.min_price.toString());
+      if (filters.max_price !== undefined) queryParams.append('max_price', filters.max_price.toString());
+      if (filters.size_min !== undefined) queryParams.append('min_size', filters.size_min.toString());
+      if (filters.max_size !== undefined) queryParams.append('max_size', filters.max_size.toString());
+      if (filters.size_unit) queryParams.append('size_unit', filters.size_unit);
+      if (filters.filter_size_unit) queryParams.append('filter_size_unit', filters.filter_size_unit);
+      if (filters.has_location !== undefined) queryParams.append('has_location', filters.has_location.toString());
+      if (filters.has_landmark !== undefined) queryParams.append('has_landmark', filters.has_landmark.toString());
+      if (filters.sortby) queryParams.append('sortby', filters.sortby);
+      if (filters.order) queryParams.append('order', filters.order);
+    }
 
     // Add pagination parameters
     if (pagination?.page !== undefined) {

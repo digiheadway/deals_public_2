@@ -178,11 +178,7 @@ export function PropertyCard({
             </h3>
             <span className="text-[0.6rem] text-gray-400 font-normal">#{property.id}</span>
           </div>
-          {ratePerUnitText && (
-            <p className="text-[0.65rem] sm:text-xs text-gray-600 mt-0.5">
-              {ratePerUnitText}
-            </p>
-          )}
+         
         </div>
         <div className="flex-shrink-0">
           <div className="flex items-center gap-0 text-sm sm:text-base font-semibold text-gray-900">
@@ -194,7 +190,8 @@ export function PropertyCard({
       {property.description && (
         <div className="flex items-start gap-1.5 sm:gap-2 mb-2 sm:mb-3">
           <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0 mt-0.5" />
-          <p className="text-xs sm:text-sm text-gray-700 leading-relaxed flex-1">{trimmedDescription}</p>
+          <p className="text-xs sm:text-sm text-gray-700 leading-relaxed flex-1">{trimmedDescription} | {ratePerUnitText}</p>
+         
         </div>
       )}
 
@@ -243,7 +240,7 @@ export function PropertyCard({
 
       {/* Created date and Public/Private icon in bottom right */}
       <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 flex items-center gap-1.5 sm:gap-2">
-        <span className={`text-[0.65rem] ${typeStyles.iconColor} opacity-60`}>
+        <span className={`text-[0.65rem] opacity-60`}>
           {createdDateText}
         </span>
         {isOwned && (
