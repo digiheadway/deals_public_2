@@ -17,6 +17,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
   const [isIOS, setIsIOS] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
 
   useEffect(() => {
     // Check if iOS
@@ -30,6 +31,15 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
       const isStandaloneMode = isStandalone || isIOSStandalone;
       
       setIsInstalled(isStandaloneMode);
+      
+      // Check if service worker is registered (indicates PWA is set up)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(registration => {
+          if (registration) {
+            setCanInstall(true);
+          }
+        });
+      }
       
       // Check localStorage for dismissed state with timestamp
       const dismissedTimestamp = localStorage.getItem('pwa-install-dismissed');
@@ -48,12 +58,18 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
     };
 
     checkIfInstalled();
+    
+    // Also check after a delay to ensure service worker has time to register
+    const delayedCheck = setTimeout(() => {
+      checkIfInstalled();
+    }, 2000);
 
     // Listen for beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       const promptEvent = e as BeforeInstallPromptEvent;
       setDeferredPrompt(promptEvent);
+      setCanInstall(true);
       // Don't auto-show prompt, wait for user to click install
     };
 
@@ -62,6 +78,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
       setIsInstalled(true);
       setDeferredPrompt(null);
       setIsDismissed(false);
+      setCanInstall(false);
       localStorage.removeItem('pwa-install-dismissed');
       sessionStorage.removeItem('pwa-auto-prompt-shown');
     };
@@ -78,7 +95,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Set up interval to re-check dismissal status
+    // Set up interval to re-check dismissal status and installability
     const checkInterval = setInterval(() => {
       const dismissedTimestamp = localStorage.getItem('pwa-install-dismissed');
       if (dismissedTimestamp) {
@@ -91,6 +108,15 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
           setIsDismissed(false);
         }
       }
+      
+      // Re-check if service worker is registered
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(registration => {
+          if (registration && !isInstalled) {
+            setCanInstall(true);
+          }
+        });
+      }
     }, 30000);
 
     // Animate in after mount
@@ -101,8 +127,9 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
       window.removeEventListener('appinstalled', handleAppInstalled);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(checkInterval);
+      clearTimeout(delayedCheck);
     };
-  }, []);
+  }, [isInstalled]);
 
   const handleInstallClick = async () => {
     // If browser prompt is available, use it directly
@@ -146,8 +173,11 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
     return null;
   }
 
-  // Show prompt if we have a deferredPrompt or we're on iOS
-  const shouldShow = deferredPrompt || (isIOS && !isInstalled);
+  // Show prompt if:
+  // 1. We have a deferredPrompt (browser supports install prompt), OR
+  // 2. We're on iOS (always show instructions), OR
+  // 3. Service worker is registered (PWA is set up) and we're not on iOS
+  const shouldShow = deferredPrompt || isIOS || (canInstall && !isIOS);
 
   if (!shouldShow) {
     return null;
