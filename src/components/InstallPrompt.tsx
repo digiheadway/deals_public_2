@@ -104,40 +104,32 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
     };
   }, []);
 
-  const handleInstallClick = () => {
-    // Show instructions first
-    setShowInstructions(true);
-  };
-
-  const handleConfirmInstall = async () => {
-    setShowInstructions(false);
-    
-    if (!deferredPrompt) {
-      // No prompt available, show manual instructions
-      const isAndroid = /Android/.test(navigator.userAgent);
-      
-      if (isIOS) {
-        alert('To install Dealer Network:\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" in the top right');
-      } else if (isAndroid) {
-        alert('To install Dealer Network:\n1. Tap the menu (⋮) in your browser\n2. Tap "Install app" or "Add to Home screen"');
-      } else {
-        alert('Look for the install icon in your browser\'s address bar, or check the browser menu for "Install" option.');
+  const handleInstallClick = async () => {
+    // If browser prompt is available, use it directly
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        sessionStorage.setItem('pwa-auto-prompt-shown', 'true');
+        const choiceResult = await deferredPrompt.userChoice;
+        
+        if (choiceResult.outcome === 'accepted') {
+          setDeferredPrompt(null);
+        }
+      } catch (error) {
+        console.error('Error showing install prompt:', error);
+        sessionStorage.removeItem('pwa-auto-prompt-shown');
       }
       return;
     }
+    
+    // No browser prompt available, show instructions as fallback
+    setShowInstructions(true);
+  };
 
-    try {
-      await deferredPrompt.prompt();
-      sessionStorage.setItem('pwa-auto-prompt-shown', 'true');
-      const choiceResult = await deferredPrompt.userChoice;
-      
-      if (choiceResult.outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
-    } catch (error) {
-      console.error('Error showing install prompt:', error);
-      sessionStorage.removeItem('pwa-auto-prompt-shown');
-    }
+  const handleConfirmInstall = () => {
+    // This is only called when instructions are shown (no deferredPrompt)
+    // Instructions modal will be closed by the "Got it" button
+    setShowInstructions(false);
   };
 
   const handleDismiss = () => {
@@ -275,31 +267,12 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
               </ol>
             </div>
 
-            {deferredPrompt && (
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowInstructions(false)}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmInstall}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all shadow-sm hover:shadow"
-                >
-                  Continue to Install
-                </button>
-              </div>
-            )}
-            
-            {!deferredPrompt && (
-              <button
-                onClick={() => setShowInstructions(false)}
-                className="w-full px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all shadow-sm hover:shadow"
-              >
-                Got it
-              </button>
-            )}
+            <button
+              onClick={handleConfirmInstall}
+              className="w-full px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all shadow-sm hover:shadow"
+            >
+              Got it
+            </button>
           </div>
         </div>
       )}
