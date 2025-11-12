@@ -4,6 +4,8 @@
  * while preserving login/authentication details
  */
 
+import { clearAreaCityCache } from './areaCityApi';
+
 // Keys to preserve (login/authentication related)
 const PRESERVED_KEYS = [
   'propnetwork_auth_token',
@@ -156,6 +158,10 @@ function clearApplicationCache(): void {
 export async function clearAllCache(): Promise<void> {
   try {
     console.log('Starting comprehensive cache clear...');
+    
+    // Clear area/city cache and in-flight request first
+    // This prevents duplicate API requests when components re-fetch after cache clear
+    clearAreaCityCache();
     
     // Clear localStorage (preserving login keys)
     clearLocalStorage();

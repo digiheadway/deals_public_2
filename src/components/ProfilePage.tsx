@@ -6,7 +6,7 @@ import { PROPERTY_TYPES, SIZE_UNITS, getCityOptions, getCityOptionsWithLabels } 
 import { authApi } from '../services/authApi';
 import { setCurrentUser } from '../types/user';
 import { PasswordChangeModal } from './PasswordChangeModal';
-import { clearAreaCityCache, getAllAreas } from '../utils/areaCityApi';
+import { getAllAreas } from '../utils/areaCityApi';
 import { clearAllCache } from '../utils/cacheUtils';
 
 interface ProfilePageProps {
@@ -346,11 +346,8 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
 
   const handleClearCache = async () => {
     try {
-      // Clear area/city cache (this is also cleared by clearAllCache, but being explicit)
-      clearAreaCityCache();
-      
       // Clear all cache, localStorage, sessionStorage, and static resources
-      // This preserves login details automatically
+      // This preserves login details automatically and also clears area/city cache
       await clearAllCache();
       
       setCacheCleared(true);

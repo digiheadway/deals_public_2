@@ -8,6 +8,9 @@ const API_URL = 'https://prop.digiheadway.in/api/dealer_network/options.php';
 const CACHE_KEY = 'propnetwork_area_city_cache';
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 day in milliseconds
 
+// Track in-flight request to prevent duplicate API calls
+let inFlightRequest: Promise<AreaCityResponse> | null = null;
+
 export interface CityAreaData {
   city: string;
   areas: string[];
@@ -65,10 +68,13 @@ function setCachedData(data: AreaCityResponse): void {
 
 /**
  * Clear the area/city cache
+ * Also clears any in-flight request to force fresh data on next call
  */
 export function clearAreaCityCache(): void {
   try {
     localStorage.removeItem(CACHE_KEY);
+    // Clear in-flight request so next call will make a fresh request
+    inFlightRequest = null;
   } catch (error) {
     console.error('Failed to clear area/city cache:', error);
   }
@@ -76,19 +82,36 @@ export function clearAreaCityCache(): void {
 
 /**
  * Fetch area/city data from API
+ * Uses request deduplication to prevent multiple simultaneous requests
  */
 async function fetchAreaCityData(): Promise<AreaCityResponse> {
-  try {
-    const response = await fetch(API_URL);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data: AreaCityResponse = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Failed to fetch area/city data:', error);
-    throw error;
+  // If there's already an in-flight request, return that promise instead of making a new request
+  if (inFlightRequest) {
+    console.log('Reusing in-flight request for area/city data');
+    return inFlightRequest;
   }
+
+  // Create new request
+  inFlightRequest = (async () => {
+    try {
+      console.log('Fetching area/city data from API...');
+      const response = await fetch(API_URL);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data: AreaCityResponse = await response.json();
+      console.log('Area/city data fetched successfully');
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch area/city data:', error);
+      throw error;
+    } finally {
+      // Clear in-flight request when done (success or failure)
+      inFlightRequest = null;
+    }
+  })();
+
+  return inFlightRequest;
 }
 
 /**
@@ -130,12 +153,27 @@ export async function getAreaCityData(forceRefresh = false): Promise<AreaCityRes
 /**
  * Get area/city data in background (non-blocking)
  * This will fetch and cache the data without blocking the UI
+ * Uses request deduplication - if a request is already in flight, it will reuse it
  */
 export function fetchAreaCityDataInBackground(): void {
   // Check if we already have valid cached data
   const cached = getCachedData();
   if (cached) {
     return; // Already have fresh data, no need to fetch
+  }
+
+  // If there's already an in-flight request, don't start a new one
+  if (inFlightRequest) {
+    // Reuse the existing request and cache the result when it completes
+    inFlightRequest
+      .then((data) => {
+        setCachedData(data);
+        console.log('Area/city data fetched and cached in background (reused request)');
+      })
+      .catch((error) => {
+        console.error('Background fetch of area/city data failed:', error);
+      });
+    return;
   }
 
   // Fetch in background without awaiting
