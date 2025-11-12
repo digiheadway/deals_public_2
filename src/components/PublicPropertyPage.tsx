@@ -41,8 +41,14 @@ export function PublicPropertyPage() {
         // The API function now has built-in request deduplication
         const foundProperty = await propertyApi.getPropertyById(propertyId);
         
-        if (foundProperty && foundProperty.is_public === 1) {
-          setProperty(foundProperty);
+        if (foundProperty) {
+          // If property is returned from public endpoint, assume it's public (is_public may not be in response)
+          // Only reject if explicitly marked as private (is_public === 0)
+          if (foundProperty.is_public === 0) {
+            setError('Property not found or not publicly available. The property may be private or the link may be invalid.');
+          } else {
+            setProperty(foundProperty);
+          }
         } else {
           setError('Property not found or not publicly available. The property may be private or the link may be invalid.');
         }

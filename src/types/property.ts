@@ -14,7 +14,7 @@ export interface Property {
   location: string;
   location_accuracy?: string;
   landmark_location?: string;
-  landmark_location_distance?: string;
+  landmark_location_distance?: number | string; // API returns number, but accepts string when updating
   is_public: number;
   public_rating?: number;
   my_rating?: number;
@@ -41,7 +41,7 @@ export interface PropertyFormData {
   location: string;
   location_accuracy?: string;
   landmark_location?: string;
-  landmark_location_distance?: string;
+  landmark_location_distance?: string; // Sent as string when updating
   is_public: number;
   tags?: string;
   highlights?: string;

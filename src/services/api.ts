@@ -77,12 +77,12 @@ function normalizeProperty(data: any): Property {
   return {
     ...data,
     id: Number(data.id),
-    owner_id: Number(data.owner_id),
+    owner_id: Number(data.owner_id || 0),
     size_min: Number(data.size_min),
     size_max: Number(data.size_max),
     price_min: Number(data.price_min),
     price_max: Number(data.price_max),
-    is_public: Number(data.is_public),
+    is_public: data.is_public !== undefined ? Number(data.is_public) : 1, // Default to 1 (public) if not provided
     public_rating: data.public_rating ? Number(data.public_rating) : undefined,
     my_rating: data.my_rating ? Number(data.my_rating) : undefined,
   };
@@ -515,6 +515,7 @@ export const propertyApi = {
         });
         
         console.log('API response received:', publicResponse.status);
+        console.log('API response data:', JSON.stringify(publicResponse.data, null, 2));
         
         // Handle fetch.php response format: {success, message, data}
         let property: any = null;
@@ -522,19 +523,27 @@ export const propertyApi = {
           if (publicResponse.data.success && publicResponse.data.data) {
             // fetch.php returns single property object in data field
             property = publicResponse.data.data;
+            console.log('Property extracted from response.data.data:', property);
           } else if (Array.isArray(publicResponse.data.data)) {
             // Handle array format if returned
             property = publicResponse.data.data[0] || null;
+            console.log('Property extracted from array:', property);
           } else if (Array.isArray(publicResponse.data)) {
             // Handle old format (direct array) for backward compatibility
             property = publicResponse.data[0] || null;
+            console.log('Property extracted from direct array:', property);
+          } else {
+            console.log('Unexpected response format:', publicResponse.data);
           }
         }
         
         if (property) {
-          return normalizeProperty(property);
+          const normalized = normalizeProperty(property);
+          console.log('Normalized property:', normalized);
+          return normalized;
         }
         
+        console.log('No property found in response');
         return null;
       } catch (error: any) {
         console.error('Error fetching property by ID:', error.response?.data || error.message);

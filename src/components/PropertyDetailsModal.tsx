@@ -179,17 +179,37 @@ export function PropertyDetailsModal({
     );
   }, [property]);
 
-  // Reset search queries when modals close
+  // Reset search queries when modals close and refetch options when modals open
   useEffect(() => {
     if (!showHighlightModal) {
       setHighlightSearchQuery('');
+    } else {
+      // Refetch highlights when modal opens (in case they weren't loaded yet)
+      if (highlightOptions.length === 0) {
+        getHighlightOptions().then((highlights) => {
+          setHighlightOptions(highlights);
+        }).catch((error) => {
+          console.error('Failed to load highlight options:', error);
+        });
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showHighlightModal]);
 
   useEffect(() => {
     if (!showTagModal) {
       setTagSearchQuery('');
+    } else {
+      // Refetch tags when modal opens (in case they weren't loaded yet)
+      if (tagOptions.length === 0) {
+        getTagOptions().then((tags) => {
+          setTagOptions(tags);
+        }).catch((error) => {
+          console.error('Failed to load tag options:', error);
+        });
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showTagModal]);
 
   const toggleHighlight = (highlight: string) => {
@@ -734,26 +754,30 @@ export function PropertyDetailsModal({
                   return (
                     <>
                       {highlightSearchQuery.length === 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {highlightsWithIcons.map((highlight) => {
-                            const Icon = highlight.icon;
-                            return (
-                              <button
-                                key={highlight.text}
-                                type="button"
-                                onClick={() => toggleHighlight(highlight.text)}
-                                className={`px-4 py-2 rounded-xl transition-colors text-sm flex items-center gap-2 ${
-                                  selectedHighlights.includes(highlight.text)
-                                    ? 'bg-blue-50 text-blue-700 font-medium'
-                                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                                }`}
-                              >
-                                <Icon className="w-4 h-4" />
-                                {highlight.text}
-                              </button>
-                            );
-                          })}
-                        </div>
+                        highlightsWithIcons.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {highlightsWithIcons.map((highlight) => {
+                              const Icon = highlight.icon;
+                              return (
+                                <button
+                                  key={highlight.text}
+                                  type="button"
+                                  onClick={() => toggleHighlight(highlight.text)}
+                                  className={`px-4 py-2 rounded-xl transition-colors text-sm flex items-center gap-2 ${
+                                    selectedHighlights.includes(highlight.text)
+                                      ? 'bg-blue-50 text-blue-700 font-medium'
+                                      : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  <Icon className="w-4 h-4" />
+                                  {highlight.text}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500 text-center py-4">No highlight options available. Type to add a custom highlight.</p>
+                        )
                       ) : (
                         <>
                           {filteredHighlights.length > 0 && (
@@ -897,22 +921,26 @@ export function PropertyDetailsModal({
                   return (
                     <>
                       {tagSearchQuery.length === 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {tagOptions.map((tag) => (
-                            <button
-                              key={tag}
-                              type="button"
-                              onClick={() => toggleTag(tag)}
-                              className={`px-4 py-2 rounded-xl transition-colors text-sm ${
-                                selectedTags.includes(tag)
-                                  ? 'bg-blue-50 text-blue-700 font-medium'
-                                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                              }`}
-                            >
-                              {tag}
-                            </button>
-                          ))}
-                        </div>
+                        tagOptions.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {tagOptions.map((tag) => (
+                              <button
+                                key={tag}
+                                type="button"
+                                onClick={() => toggleTag(tag)}
+                                className={`px-4 py-2 rounded-xl transition-colors text-sm ${
+                                  selectedTags.includes(tag)
+                                    ? 'bg-blue-50 text-blue-700 font-medium'
+                                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                }`}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500 text-center py-4">No tag options available. Type to add a custom tag.</p>
+                        )
                       ) : (
                         <>
                           {filteredTags.length > 0 && (
