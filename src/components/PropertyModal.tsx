@@ -4,10 +4,9 @@ import { Property, PropertyFormData } from '../types/property';
 import { getUserSettings } from '../types/userSettings';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  AREA_OPTIONS,
-  CITY_OPTIONS_WITH_LABELS,
   PROPERTY_TYPE_OPTIONS,
   SIZE_UNIT_OPTIONS,
+  getCityOptionsWithLabels,
 } from '../utils/filterOptions';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 import { fetchAreaCityDataInBackground, getAreaCityData, getAreasForCity, updateCacheWithCityArea } from '../utils/areaCityApi';
@@ -196,24 +195,32 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
   }, [showSizeUnitDropdown, showCityDropdown, showPropertyTypeDropdown]);
 
   const currentSizeUnitLabel = SIZE_UNIT_OPTIONS.find(opt => opt.value === formData.size_unit)?.label || formData.size_unit;
-  const currentCityLabel = cityOptionsWithLabels.find(opt => opt.value === formData.city)?.label || CITY_OPTIONS_WITH_LABELS.find(opt => opt.value === formData.city)?.label || formData.city;
+  const currentCityLabel = cityOptionsWithLabels.find(opt => opt.value === formData.city)?.label || formData.city;
   const currentPropertyTypeLabel = PROPERTY_TYPE_OPTIONS.find(opt => opt.value === formData.type)?.label || formData.type || 'Select property type';
 
-  // Fetch area/city data in background when modal opens (for new properties only)
+  // Fetch area/city data when modal opens
   useEffect(() => {
-    if (!property) {
-      // Fetch in background without blocking UI
-      fetchAreaCityDataInBackground();
-      
-      // Also try to load cached data immediately
-      getAreaCityData().then((data) => {
-        if (data) {
-          const cityList = data.cities.map((c) => c.city);
-          setCities(cityList);
-          setCityOptionsWithLabels(cityList.map((city) => ({ value: city, label: city })));
-        }
-      });
-    }
+    // Fetch in background without blocking UI
+    fetchAreaCityDataInBackground();
+    
+    // Also try to load cached data immediately
+    getAreaCityData().then((data) => {
+      if (data) {
+        const cityList = data.cities.map((c) => c.city);
+        setCities(cityList);
+        setCityOptionsWithLabels(cityList.map((city) => ({ value: city, label: city })));
+      }
+    });
+    
+    // Also fetch from API to ensure we have the latest data
+    getCityOptionsWithLabels().then((options) => {
+      if (options && options.length > 0) {
+        setCities(options.map(opt => opt.value));
+        setCityOptionsWithLabels(options);
+      }
+    }).catch((error) => {
+      console.error('Failed to load city options:', error);
+    });
   }, [property]);
 
   // Update areas when city changes (after cities are loaded)
@@ -568,7 +575,7 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 </button>
                 {showCityDropdown && (
                   <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 min-w-[120px] max-h-64 overflow-y-auto">
-                    {(cityOptionsWithLabels.length > 0 ? cityOptionsWithLabels : CITY_OPTIONS_WITH_LABELS).map((option) => (
+                    {cityOptionsWithLabels.map((option) => (
                       <button
                         key={option.value}
                         type="button"
@@ -673,8 +680,8 @@ export function PropertyModal({ property, onClose, onSubmit }: PropertyModalProp
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                   {(() => {
                     const searchQuery = formData.area.toLowerCase().trim();
-                    // Use dynamic areas if available, otherwise fallback to static AREA_OPTIONS
-                    const availableAreas = areas.length > 0 ? areas : AREA_OPTIONS;
+                    // Use dynamic areas from API
+                    const availableAreas = areas;
                     const filteredAreas = availableAreas.filter(area =>
                       area.toLowerCase().includes(searchQuery)
                     );

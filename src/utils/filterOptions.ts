@@ -14,7 +14,7 @@ export const STORAGE_KEYS = {
  * Values map to API column names: All, All General, or specific column names
  */
 export const SEARCH_COLUMNS = [
-  { value: '', label: 'All Info' }, // Maps to 'All' in API
+  { value: 'all', label: 'All Info' }, // Maps to 'All' in API
   { value: 'general', label: 'All General' }, // Maps to 'All General' in API
   { value: 'id', label: 'ID' },
   { value: 'city', label: 'City' },
@@ -22,11 +22,8 @@ export const SEARCH_COLUMNS = [
   { value: 'type', label: 'Property Type' },
   { value: 'description', label: 'Description' },
   { value: 'heading', label: 'Heading' },
-  { value: 'size_min', label: 'Min Size' },
-  { value: 'size_max', label: 'Max Size' },
-  { value: 'size_unit', label: 'Size Unit' },
-  { value: 'price_min', label: 'Min Price' },
-  { value: 'price_max', label: 'Max Price' },
+  { value: 'size', label: 'Size' }, 
+  { value: 'price', label: 'Price' },
   { value: 'tags', label: 'Tags' },
   { value: 'highlights', label: 'Highlights' },
   { value: 'note_private', label: 'Private Note' },
@@ -92,68 +89,6 @@ export function getSearchColumnsSortedByUsage(): Array<{ value: string; label: s
 }
 
 /**
- * Available city options
- */
-export const CITY_OPTIONS = [
-  'Panipat',
-  'Karnal',
-  'Sonipat',
-] as const;
-
-/**
- * City options with labels (for dropdowns)
- */
-export const CITY_OPTIONS_WITH_LABELS = [
-  { value: 'Panipat', label: 'Panipat' },
-  { value: 'Karnal', label: 'Karnal' },
-  { value: 'Sonipat', label: 'Sonipat' },
-] as const;
-
-/**
- * Available area options (primarily for Panipat city)
- */
-export const AREA_OPTIONS = [
-  'Sector 6',
-  'Sector 7',
-  'Sector 8',
-  'Sector 11',
-  'Sector 12',
-  'Sector 18',
-  'Sector 24',
-  'Sector 25',
-  'TDI City',
-  'Ansal',
-  'M3M',
-  'Vrinda Enclave',
-  'Yamuna Enclave',
-  'Eldeco Estate One',
-  'Eldeco Paradiso',
-  'DLF',
-  'Maxwell Ceremony',
-  'Tehsil Camp',
-  'Patel Nagar',
-  'Preet Vihar',
-  'Modal Town',
-  'Virat Nagar Phase 1',
-  'Virat Nagar Phase 2',
-  'Virat Nagar Phase 3',
-  'Virak Nagar',
-  'Ram Nagar',
-  'Mukhija',
-  'New Mukhija',
-  'Raj Nagar',
-  'The Address',
-  'PBM Enclave',
-  'Malik Enclave',
-  'Jeetram Nagar',
-  'Bagat Sing Colony',
-  'Vasant Kunj',
-  '8 Marla',
-  'Radhe Vihar',
-  'Shanti Nagar',
-] as const;
-
-/**
  * Available property type options
  */
 export const PROPERTY_TYPES = [
@@ -215,42 +150,121 @@ export const SIZE_UNIT_OPTIONS = [
   { value: 'Acre', label: 'Acre' },
 ] as const;
 
-/**
- * Available highlight options for properties
- */
-export const HIGHLIGHT_OPTIONS = [
-  'Corner',
-  'Urgent Sale',
-  'On 12 Meter',
-  'On 18 Meter',
-  'On 24 Meter',
-  'On Wide Road',
-  'Prime Location',
-  'Two Side Open',
-  'Park Facing',
-  'East Facing',
-  'South Facing',
-  '3 Side Open',
-  'Gated Society',
-  'Good Connectivity',
-  'Multipurpose',
-  'Green Belt',
-  'Extra Space',
-  'Luxury Builtup',
-  'Very Less Price',
-  'Great Investment',
-] as const;
 
 /**
- * Available tag options for properties
+ * Dynamic options cache - stores fetched options to avoid repeated API calls
  */
-export const TAG_OPTIONS = [
-  'Indirect',
-  'On Priority',
-  'High Demand',
-  'Focus',
-  'Pending Work',
-  'List 1',
-  'List 2',
-] as const;
+let cachedHighlights: string[] | null = null;
+let cachedTags: string[] | null = null;
+let cachedCities: string[] | null = null;
+let cachedCityOptionsWithLabels: Array<{ value: string; label: string }> | null = null;
+
+/**
+ * Get dynamic city options from API
+ */
+export async function getCityOptions(): Promise<string[]> {
+  // Return cached options if available
+  if (cachedCities !== null) {
+    return cachedCities;
+  }
+
+  try {
+    // Import dynamically to avoid circular dependencies
+    const { getCities } = await import('./areaCityApi');
+    const cities = await getCities();
+    if (cities && cities.length > 0) {
+      cachedCities = cities;
+      return cities;
+    }
+  } catch (error) {
+    console.error('Failed to fetch cities from API:', error);
+  }
+
+  // Return empty array if API fails (no fallback)
+  return [];
+}
+
+/**
+ * Get city options with labels from API (for dropdowns)
+ */
+export async function getCityOptionsWithLabels(): Promise<Array<{ value: string; label: string }>> {
+  // Return cached options if available
+  if (cachedCityOptionsWithLabels !== null) {
+    return cachedCityOptionsWithLabels;
+  }
+
+  try {
+    const cities = await getCityOptions();
+    if (cities && cities.length > 0) {
+      const options = cities.map((city) => ({ value: city, label: city }));
+      cachedCityOptionsWithLabels = options;
+      return options;
+    }
+  } catch (error) {
+    console.error('Failed to fetch city options with labels:', error);
+  }
+
+  // Return empty array if API fails (no fallback)
+  return [];
+}
+
+/**
+ * Get dynamic highlight options from API
+ */
+export async function getHighlightOptions(): Promise<string[]> {
+  // Return cached options if available
+  if (cachedHighlights !== null) {
+    return cachedHighlights;
+  }
+
+  try {
+    // Import dynamically to avoid circular dependencies
+    const { getHighlights } = await import('./areaCityApi');
+    const highlights = await getHighlights();
+    if (highlights && highlights.length > 0) {
+      cachedHighlights = highlights;
+      return highlights;
+    }
+  } catch (error) {
+    console.error('Failed to fetch highlights from API:', error);
+  }
+
+  // Return empty array if API fails (no fallback)
+  return [];
+}
+
+/**
+ * Get dynamic tag options from API
+ */
+export async function getTagOptions(): Promise<string[]> {
+  // Return cached options if available
+  if (cachedTags !== null) {
+    return cachedTags;
+  }
+
+  try {
+    // Import dynamically to avoid circular dependencies
+    const { getTags } = await import('./areaCityApi');
+    const tags = await getTags();
+    if (tags && tags.length > 0) {
+      cachedTags = tags;
+      return tags;
+    }
+  } catch (error) {
+    console.error('Failed to fetch tags from API:', error);
+  }
+
+  // Return empty array if API fails (no fallback)
+  return [];
+}
+
+/**
+ * Clear the options cache (useful when refreshing data)
+ */
+export function clearOptionsCache(): void {
+  cachedHighlights = null;
+  cachedTags = null;
+  cachedCities = null;
+  cachedCityOptionsWithLabels = null;
+}
 

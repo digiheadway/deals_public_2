@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Phone, Lock, Building, MapPin, ChevronDown, Eye, EyeOff } from 'lucide-react';
-import { CITY_OPTIONS, AREA_OPTIONS, PROPERTY_TYPES } from '../utils/filterOptions';
+import { PROPERTY_TYPES, getCityOptions } from '../utils/filterOptions';
+import { getAllAreas } from '../utils/areaCityApi';
 
 interface AuthPageProps {
   onLogin: (userId: number) => void;
@@ -27,6 +28,25 @@ export function AuthPage({ onLogin, onGoToHome }: AuthPageProps) {
   const [signupArea, setSignupArea] = useState<string[]>([]);
   const [signupPropertyType, setSignupPropertyType] = useState<string[]>([]);
   const [showAdditionalDetails, setShowAdditionalDetails] = useState(false);
+  
+  // Dynamic city and area options from API
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [areaOptions, setAreaOptions] = useState<string[]>([]);
+  
+  // Fetch city and area options on mount
+  useEffect(() => {
+    getCityOptions().then((cities) => {
+      setCityOptions(cities);
+    }).catch((error) => {
+      console.error('Failed to load city options:', error);
+    });
+    
+    getAllAreas().then((areas) => {
+      setAreaOptions(areas);
+    }).catch((error) => {
+      console.error('Failed to load area options:', error);
+    });
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -437,7 +457,7 @@ export function AuthPage({ onLogin, onGoToHome }: AuthPageProps) {
                       className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
                     >
                       <option value="">Select City</option>
-                      {CITY_OPTIONS.map((city) => (
+                      {cityOptions.map((city) => (
                         <option key={city} value={city}>
                           {city}
                         </option>
@@ -453,7 +473,7 @@ export function AuthPage({ onLogin, onGoToHome }: AuthPageProps) {
                   </label>
                   <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto bg-white">
                     <div className="space-y-2">
-                      {AREA_OPTIONS.map((area) => (
+                      {areaOptions.map((area) => (
                         <label key={area} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
                           <input
                             type="checkbox"

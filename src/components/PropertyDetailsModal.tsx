@@ -3,7 +3,7 @@ import { X, Share2, Trash2, MessageCircle, Edit2, Plus, Ruler, IndianRupee, MapP
 import { Property } from '../types/property';
 import { formatPrice } from '../utils/priceFormatter';
 import { formatSize } from '../utils/sizeFormatter';
-import { HIGHLIGHT_OPTIONS, TAG_OPTIONS } from '../utils/filterOptions';
+import { getHighlightOptions, getTagOptions } from '../utils/filterOptions';
 import { LocationModal } from './LocationModal';
 import { LocationViewModal } from './LocationViewModal';
 import { OwnerDetailsModal } from './OwnerDetailsModal';
@@ -51,11 +51,13 @@ const getHighlightIcon = (highlight: string) => {
   return iconMap[highlight] || Sparkles;
 };
 
-// Convert highlight options to format with icons
-const HIGHLIGHT_OPTIONS_WITH_ICONS = HIGHLIGHT_OPTIONS.map(text => ({
-  text,
-  icon: getHighlightIcon(text),
-}));
+// Helper function to convert highlight options to format with icons
+const createHighlightOptionsWithIcons = (highlights: string[]) => {
+  return highlights.map(text => ({
+    text,
+    icon: getHighlightIcon(text),
+  }));
+};
 
 // Helper function to check if location has lat/long format
 function hasLocationCoordinates(location: string | undefined): boolean {
@@ -117,6 +119,23 @@ export function PropertyDetailsModal({
   );
   const [highlightSearchQuery, setHighlightSearchQuery] = useState('');
   const [tagSearchQuery, setTagSearchQuery] = useState('');
+  const [highlightOptions, setHighlightOptions] = useState<string[]>([]);
+  const [tagOptions, setTagOptions] = useState<string[]>([]);
+  
+  // Fetch dynamic options on mount
+  useEffect(() => {
+    getHighlightOptions().then((highlights) => {
+      setHighlightOptions(highlights);
+    }).catch((error) => {
+      console.error('Failed to load highlight options:', error);
+    });
+    
+    getTagOptions().then((tags) => {
+      setTagOptions(tags);
+    }).catch((error) => {
+      console.error('Failed to load tag options:', error);
+    });
+  }, []);
 
   // Parse location coordinates
   const parseLocation = (location: string | undefined): { lat: number; lng: number } | null => {
@@ -702,11 +721,12 @@ export function PropertyDetailsModal({
 
               <div className="h-[280px] overflow-y-auto">
                 {(() => {
+                  const highlightsWithIcons = createHighlightOptionsWithIcons(highlightOptions);
                   const searchLower = highlightSearchQuery.toLowerCase().trim();
-                  const filteredHighlights = HIGHLIGHT_OPTIONS_WITH_ICONS.filter(highlight =>
+                  const filteredHighlights = highlightsWithIcons.filter(highlight =>
                     highlight.text.toLowerCase().includes(searchLower)
                   );
-                  const exactMatch = HIGHLIGHT_OPTIONS.some(opt => 
+                  const exactMatch = highlightOptions.some(opt => 
                     opt.toLowerCase() === searchLower
                   );
                   const showAddNew = searchLower.length > 0 && !exactMatch && !selectedHighlights.includes(highlightSearchQuery.trim());
@@ -715,7 +735,7 @@ export function PropertyDetailsModal({
                     <>
                       {highlightSearchQuery.length === 0 ? (
                         <div className="flex flex-wrap gap-2">
-                          {HIGHLIGHT_OPTIONS_WITH_ICONS.map((highlight) => {
+                          {highlightsWithIcons.map((highlight) => {
                             const Icon = highlight.icon;
                             return (
                               <button
@@ -866,10 +886,10 @@ export function PropertyDetailsModal({
               <div className="h-[200px] overflow-y-auto">
                 {(() => {
                   const searchLower = tagSearchQuery.toLowerCase().trim();
-                  const filteredTags = TAG_OPTIONS.filter(tag =>
+                  const filteredTags = tagOptions.filter(tag =>
                     tag.toLowerCase().includes(searchLower)
                   );
-                  const exactMatch = TAG_OPTIONS.some(opt => 
+                  const exactMatch = tagOptions.some(opt => 
                     opt.toLowerCase() === searchLower
                   );
                   const showAddNew = searchLower.length > 0 && !exactMatch && !selectedTags.includes(tagSearchQuery.trim());
@@ -878,7 +898,7 @@ export function PropertyDetailsModal({
                     <>
                       {tagSearchQuery.length === 0 ? (
                         <div className="flex flex-wrap gap-2">
-                          {TAG_OPTIONS.map((tag) => (
+                          {tagOptions.map((tag) => (
                             <button
                               key={tag}
                               type="button"

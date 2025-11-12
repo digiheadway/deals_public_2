@@ -6,14 +6,14 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   STORAGE_KEYS,
   SEARCH_COLUMNS,
-  CITY_OPTIONS,
-  AREA_OPTIONS,
   PROPERTY_TYPE_OPTIONS,
   SIZE_UNIT_OPTIONS,
-  TAG_OPTIONS,
-  HIGHLIGHT_OPTIONS,
   getSearchColumnsSortedByUsage,
   trackColumnUsage,
+  getHighlightOptions,
+  getTagOptions,
+  getCityOptions,
+  getCityOptionsWithLabels,
 } from '../utils/filterOptions';
 import { getAreaCityData, getCities, getAllAreas, getAreasForCity, fetchAreaCityDataInBackground, updateCacheWithCityArea } from '../utils/areaCityApi';
 import { RangeSlider } from './RangeSlider';
@@ -143,6 +143,10 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   const [areaOptions, setAreaOptions] = useState<string[]>([]);
   const [filteredAreaOptions, setFilteredAreaOptions] = useState<string[]>([]);
   
+  // Dynamic highlight and tag options from API
+  const [highlightOptions, setHighlightOptions] = useState<Array<{value: string; label: string}>>([]);
+  const [tagOptions, setTagOptions] = useState<Array<{value: string; label: string}>>([]);
+  
   // Range values for sliders
   const [priceRange, setPriceRange] = useState<[number, number]>([
     filters.min_price ?? 0,
@@ -179,12 +183,32 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
         getAllAreas().then((areas) => {
           setAreaOptions(areas);
         });
-      } else {
-        // Fallback to static options if API data not available
-        setCityOptions([...CITY_OPTIONS]);
-        setCityOptionsWithLabels(CITY_OPTIONS.map((city) => ({ value: city, label: city })));
-        setAreaOptions([...AREA_OPTIONS]);
       }
+    });
+    
+    // Fetch city options from API
+    getCityOptions().then((cities) => {
+      if (cities && cities.length > 0) {
+        setCityOptions(cities);
+        getCityOptionsWithLabels().then((cityOptionsWithLabels) => {
+          setCityOptionsWithLabels(cityOptionsWithLabels);
+        });
+      }
+    }).catch((error) => {
+      console.error('Failed to load city options:', error);
+    });
+    
+    // Fetch highlight and tag options
+    getHighlightOptions().then((highlights) => {
+      setHighlightOptions(highlights.map((h) => ({ value: h, label: h })));
+    }).catch((error) => {
+      console.error('Failed to load highlight options:', error);
+    });
+    
+    getTagOptions().then((tags) => {
+      setTagOptions(tags.map((t) => ({ value: t, label: t })));
+    }).catch((error) => {
+      console.error('Failed to load tag options:', error);
     });
   }, []); // Only run on mount
 
@@ -207,21 +231,20 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
           // Fallback to all areas if city not found in API data
           try {
             const allAreas = await getAllAreas();
-            setFilteredAreaOptions(allAreas.length > 0 ? allAreas : [...AREA_OPTIONS]);
+            setFilteredAreaOptions(allAreas);
           } catch {
-            setFilteredAreaOptions([...AREA_OPTIONS]);
+            setFilteredAreaOptions([]);
           }
         }
       } catch (error) {
         console.error('Error fetching areas for city:', error);
-        // On error, fallback to all areas
+        // On error, try to get all areas
         try {
           const allAreas = await getAllAreas();
-          setFilteredAreaOptions(allAreas.length > 0 ? allAreas : [...AREA_OPTIONS]);
+          setFilteredAreaOptions(allAreas);
         } catch (fallbackError) {
           console.error('Error fetching all areas:', fallbackError);
-          // Use static options as last resort
-          setFilteredAreaOptions([...AREA_OPTIONS]);
+          setFilteredAreaOptions([]);
         }
       }
     };
@@ -820,9 +843,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
             <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto z-50">
               {(filters.city && filteredAreaOptions.length > 0 
                 ? filteredAreaOptions 
-                : filters.city 
-                  ? [] // City selected but no areas yet - show empty until loaded
-                  : AREA_OPTIONS).map((area, idx) => (
+                : []).map((area, idx) => (
                 <button
                   key={idx}
                   type="button"
@@ -872,7 +893,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                         }}
                         className="px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                       >
-                        {(cityOptionsWithLabels.length > 0 ? cityOptionsWithLabels : CITY_OPTIONS.map(c => ({value: c, label: c}))).map((option) => (
+                        {cityOptionsWithLabels.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
@@ -896,9 +917,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                         <div className="absolute z-[70] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                           {(filters.city && filteredAreaOptions.length > 0 
                             ? filteredAreaOptions 
-                            : filters.city 
-                              ? [] // City selected but no areas yet - show empty until loaded
-                              : AREA_OPTIONS).filter(area =>
+                            : []).filter(area =>
                             area.toLowerCase().includes((filters.area || '').toLowerCase())
                           ).map((area, idx) => (
                             <button
@@ -984,7 +1003,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                     <div className="space-y-3 pt-2">
                       {/* Tags - Multi-select */}
                       <MultiSelect
-                        options={[...TAG_OPTIONS]}
+                        options={tagOptions}
                         value={selectedTags}
                         onChange={handleTagsChange}
                         placeholder="Select tags"
@@ -993,7 +1012,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
 
                       {/* Highlights - Multi-select */}
                       <MultiSelect
-                        options={[...HIGHLIGHT_OPTIONS]}
+                        options={highlightOptions}
                         value={selectedHighlights}
                         onChange={handleHighlightsChange}
                         placeholder="Select highlights"
@@ -1131,7 +1150,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                       }}
                       className="px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                     >
-                      {(cityOptionsWithLabels.length > 0 ? cityOptionsWithLabels : CITY_OPTIONS.map(c => ({value: c, label: c}))).map((option) => (
+                      {cityOptionsWithLabels.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
@@ -1155,9 +1174,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                     <div className="absolute z-[70] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                       {(filters.city && filteredAreaOptions.length > 0 
                         ? filteredAreaOptions 
-                        : filters.city 
-                          ? [] // City selected but no areas yet - show empty until loaded
-                          : AREA_OPTIONS).filter(area =>
+                        : []).filter(area =>
                         area.toLowerCase().includes((filters.area || '').toLowerCase())
                       ).map((area, idx) => (
                         <button
@@ -1242,7 +1259,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                   {/* Tags - Multi-select */}
                   <MultiSelect
-                    options={[...TAG_OPTIONS]}
+                    options={tagOptions}
                     value={selectedTags}
                     onChange={handleTagsChange}
                     placeholder="Select tags"
@@ -1251,7 +1268,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
 
                   {/* Highlights - Multi-select */}
                   <MultiSelect
-                    options={[...HIGHLIGHT_OPTIONS]}
+                    options={highlightOptions}
                     value={selectedHighlights}
                     onChange={handleHighlightsChange}
                     placeholder="Select highlights"

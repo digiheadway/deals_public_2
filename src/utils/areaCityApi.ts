@@ -15,6 +15,8 @@ export interface CityAreaData {
 
 export interface AreaCityResponse {
   cities: CityAreaData[];
+  highlights?: string[];
+  tags?: string[];
 }
 
 interface CachedData {
@@ -175,6 +177,24 @@ export async function getAllAreas(): Promise<string[]> {
   const allAreas = data.cities.flatMap((city) => city.areas);
   // Remove duplicates and sort
   return Array.from(new Set(allAreas)).sort();
+}
+
+/**
+ * Get highlights from cached or API data
+ */
+export async function getHighlights(): Promise<string[]> {
+  const data = await getAreaCityData();
+  if (!data || !data.highlights) return [];
+  return data.highlights;
+}
+
+/**
+ * Get tags from cached or API data
+ */
+export async function getTags(): Promise<string[]> {
+  const data = await getAreaCityData();
+  if (!data || !data.tags) return [];
+  return data.tags;
 }
 
 /**

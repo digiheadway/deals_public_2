@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Save, LogOut, User, CheckCircle2, Lock, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { CITY_OPTIONS, AREA_OPTIONS, PROPERTY_TYPES, SIZE_UNITS } from '../utils/filterOptions';
+import { PROPERTY_TYPES, SIZE_UNITS, getCityOptions, getCityOptionsWithLabels } from '../utils/filterOptions';
 import { authApi } from '../services/authApi';
 import { setCurrentUser } from '../types/user';
 import { PasswordChangeModal } from './PasswordChangeModal';
-import { clearAreaCityCache } from '../utils/areaCityApi';
+import { clearAreaCityCache, getAllAreas } from '../utils/areaCityApi';
+import { clearAllCache } from '../utils/cacheUtils';
 
 interface ProfilePageProps {
   onBack: () => void;
@@ -41,6 +42,25 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab') as 'preferences' | 'profile' | null;
   const [activeTab, setActiveTab] = useState<'preferences' | 'profile'>(tabFromUrl === 'profile' ? 'profile' : 'preferences');
+  
+  // Dynamic city and area options from API
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [areaOptions, setAreaOptions] = useState<string[]>([]);
+  
+  // Fetch city and area options on mount
+  useEffect(() => {
+    getCityOptions().then((cities) => {
+      setCityOptions(cities);
+    }).catch((error) => {
+      console.error('Failed to load city options:', error);
+    });
+    
+    getAllAreas().then((areas) => {
+      setAreaOptions(areas);
+    }).catch((error) => {
+      console.error('Failed to load area options:', error);
+    });
+  }, []);
   
   // Initialize profile data from user context if available
   const [profileData, setProfileData] = useState<ProfileData>(() => {
@@ -324,10 +344,22 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
     return value ? value.split(',').map(i => i.trim()).filter(i => i) : [];
   };
 
-  const handleClearCache = () => {
-    clearAreaCityCache();
-    setCacheCleared(true);
-    setTimeout(() => setCacheCleared(false), 3000);
+  const handleClearCache = async () => {
+    try {
+      // Clear area/city cache (this is also cleared by clearAllCache, but being explicit)
+      clearAreaCityCache();
+      
+      // Clear all cache, localStorage, sessionStorage, and static resources
+      // This preserves login details automatically
+      await clearAllCache();
+      
+      setCacheCleared(true);
+      setTimeout(() => setCacheCleared(false), 3000);
+    } catch (error) {
+      console.error('Failed to clear cache:', error);
+      setError('Failed to clear cache. Please try again.');
+      setTimeout(() => setError(''), 5000);
+    }
   };
 
   return (
@@ -428,7 +460,7 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-700 text-sm"
                   >
                     <option value="">Select default city</option>
-                    {CITY_OPTIONS.map(city => (
+                    {cityOptions.map(city => (
                       <option key={city} value={city}>{city}</option>
                     ))}
                   </select>
@@ -443,7 +475,7 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-700 text-sm"
                   >
                     <option value="">Select default area</option>
-                    {AREA_OPTIONS.map(area => (
+                    {areaOptions.map(area => (
                       <option key={area} value={area}>{area}</option>
                     ))}
                   </select>
@@ -551,7 +583,7 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
                         </button>
                         {showAreaCoversDropdown && (
                           <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                            {AREA_OPTIONS.map(area => {
+                            {areaOptions.map(area => {
                               const isSelected = getArrayItems(profileData.area_covers).includes(area);
                               return (
                                 <button
@@ -626,7 +658,7 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
                         </button>
                         {showCityCoversDropdown && (
                           <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                            {CITY_OPTIONS.map(city => {
+                            {cityOptions.map(city => {
                               const isSelected = getArrayItems(profileData.city_covers).includes(city);
                               return (
                                 <button
@@ -782,12 +814,12 @@ export function ProfilePage({ onBack, onLogout }: ProfilePageProps) {
                   className="w-full px-4 py-2.5 bg-white border border-orange-200 rounded-lg font-medium hover:border-orange-400 hover:bg-orange-50 transition-all duration-200 flex items-center justify-center gap-2 text-orange-600 hover:text-orange-700 text-sm"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Clear Area/City Cache
+                  Clear All Cache
                 </button>
                 {cacheCleared && (
                   <div className="flex items-center justify-center gap-2 text-green-600 font-medium text-sm">
                     <CheckCircle2 className="w-4 h-4" />
-                    <p>Cache cleared successfully!</p>
+                    <p>All cache cleared successfully! Login details preserved.</p>
                   </div>
                 )}
 

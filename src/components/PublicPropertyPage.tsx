@@ -5,7 +5,6 @@ import { Property } from '../types/property';
 import { propertyApi } from '../services/api';
 import { formatPrice, formatPriceWithLabel } from '../utils/priceFormatter';
 import { formatSize } from '../utils/sizeFormatter';
-import { HIGHLIGHT_OPTIONS } from '../utils/filterOptions';
 
 export function PublicPropertyPage() {
   const { id } = useParams<{ id: string }>();
