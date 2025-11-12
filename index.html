@@ -19,6 +19,25 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Capture beforeinstallprompt event early, before React loads
+      let deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        // Store in window for React component to access
+        window.deferredPrompt = deferredPrompt;
+        // Also store a flag to indicate it's available
+        window.pwaInstallPromptAvailable = true;
+      });
+      
+      // Clear when app is installed
+      window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        window.deferredPrompt = null;
+        window.pwaInstallPromptAvailable = false;
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

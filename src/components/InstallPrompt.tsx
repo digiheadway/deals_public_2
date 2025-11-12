@@ -59,17 +59,33 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
 
     checkIfInstalled();
     
+    // Check if deferredPrompt was already captured by the early script
+    const checkStoredPrompt = () => {
+      const storedPrompt = (window as any).deferredPrompt as BeforeInstallPromptEvent | null;
+      if (storedPrompt) {
+        setDeferredPrompt(storedPrompt);
+        setCanInstall(true);
+      }
+    };
+    
+    // Check immediately
+    checkStoredPrompt();
+    
     // Also check after a delay to ensure service worker has time to register
     const delayedCheck = setTimeout(() => {
       checkIfInstalled();
+      checkStoredPrompt();
     }, 2000);
 
-    // Listen for beforeinstallprompt event
+    // Listen for beforeinstallprompt event (in case it fires after component mounts)
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       const promptEvent = e as BeforeInstallPromptEvent;
       setDeferredPrompt(promptEvent);
       setCanInstall(true);
+      // Also store in window for persistence
+      (window as any).deferredPrompt = promptEvent;
+      (window as any).pwaInstallPromptAvailable = true;
       // Don't auto-show prompt, wait for user to click install
     };
 
@@ -132,19 +148,34 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
   }, [isInstalled]);
 
   const handleInstallClick = async () => {
+    // First check if we have a deferred prompt in state
+    let promptToUse = deferredPrompt;
+    
+    // If not in state, check if it's stored in window (captured by early script)
+    if (!promptToUse) {
+      promptToUse = (window as any).deferredPrompt as BeforeInstallPromptEvent | null;
+      if (promptToUse) {
+        setDeferredPrompt(promptToUse);
+      }
+    }
+    
     // If browser prompt is available, use it directly
-    if (deferredPrompt) {
+    if (promptToUse) {
       try {
-        await deferredPrompt.prompt();
+        await promptToUse.prompt();
         sessionStorage.setItem('pwa-auto-prompt-shown', 'true');
-        const choiceResult = await deferredPrompt.userChoice;
+        const choiceResult = await promptToUse.userChoice;
         
         if (choiceResult.outcome === 'accepted') {
           setDeferredPrompt(null);
+          (window as any).deferredPrompt = null;
+          (window as any).pwaInstallPromptAvailable = false;
         }
       } catch (error) {
         console.error('Error showing install prompt:', error);
         sessionStorage.removeItem('pwa-auto-prompt-shown');
+        // If prompt fails, show instructions as fallback
+        setShowInstructions(true);
       }
       return;
     }
@@ -173,11 +204,15 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
     return null;
   }
 
+  // Check if we have a stored prompt in window (captured by early script)
+  const hasStoredPrompt = !!(window as any).deferredPrompt;
+  const hasPrompt = deferredPrompt || hasStoredPrompt;
+
   // Show prompt if:
   // 1. We have a deferredPrompt (browser supports install prompt), OR
   // 2. We're on iOS (always show instructions), OR
   // 3. Service worker is registered (PWA is set up) and we're not on iOS
-  const shouldShow = deferredPrompt || isIOS || (canInstall && !isIOS);
+  const shouldShow = hasPrompt || isIOS || (canInstall && !isIOS);
 
   if (!shouldShow) {
     return null;
