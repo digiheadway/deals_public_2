@@ -39,7 +39,7 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
     note: false, // unchecked by default
     locationLink: false,
     landmarkLink: true,
-    link: true,
+    link: false,
   });
   const [copied, setCopied] = useState(false);
 
@@ -230,11 +230,10 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
                   className="sr-only"
                 />
                 <div
-                  className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${
-                    selectedFields.id
+                  className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${selectedFields.id
                       ? "bg-blue-600 border-blue-600"
                       : "border-gray-300"
-                  }`}
+                    }`}
                 >
                   {selectedFields.id && (
                     <Check className="w-3 h-3 text-white" />
@@ -253,11 +252,10 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
                   className="sr-only"
                 />
                 <div
-                  className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${
-                    selectedFields.heading
+                  className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${selectedFields.heading
                       ? "bg-blue-600 border-blue-600"
                       : "border-gray-300"
-                  }`}
+                    }`}
                 >
                   {selectedFields.heading && (
                     <Check className="w-3 h-3 text-white" />
@@ -276,11 +274,10 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
                   className="sr-only"
                 />
                 <div
-                  className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${
-                    selectedFields.price
+                  className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${selectedFields.price
                       ? "bg-blue-600 border-blue-600"
                       : "border-gray-300"
-                  }`}
+                    }`}
                 >
                   {selectedFields.price && (
                     <Check className="w-3 h-3 text-white" />
@@ -299,11 +296,10 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
                   className="sr-only"
                 />
                 <div
-                  className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${
-                    selectedFields.description
+                  className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${selectedFields.description
                       ? "bg-blue-600 border-blue-600"
                       : "border-gray-300"
-                  }`}
+                    }`}
                 >
                   {selectedFields.description && (
                     <Check className="w-3 h-3 text-white" />
@@ -325,11 +321,10 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
                     className="sr-only"
                   />
                   <div
-                    className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${
-                      selectedFields.note
+                    className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${selectedFields.note
                         ? "bg-blue-600 border-blue-600"
                         : "border-gray-300"
-                    }`}
+                      }`}
                   >
                     {selectedFields.note && (
                       <Check className="w-3 h-3 text-white" />
@@ -350,11 +345,10 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
                     className="sr-only"
                   />
                   <div
-                    className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${
-                      selectedFields.locationLink
+                    className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${selectedFields.locationLink
                         ? "bg-blue-600 border-blue-600"
                         : "border-gray-300"
-                    }`}
+                      }`}
                   >
                     {selectedFields.locationLink && (
                       <Check className="w-3 h-3 text-white" />
@@ -377,11 +371,10 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
                     className="sr-only"
                   />
                   <div
-                    className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${
-                      selectedFields.landmarkLink
+                    className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${selectedFields.landmarkLink
                         ? "bg-blue-600 border-blue-600"
                         : "border-gray-300"
-                    }`}
+                      }`}
                   >
                     {selectedFields.landmarkLink && (
                       <Check className="w-3 h-3 text-white" />
@@ -404,11 +397,10 @@ export function ShareModal({ property, isOwned, onClose }: ShareModalProps) {
                     className="sr-only"
                   />
                   <div
-                    className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${
-                      selectedFields.link
+                    className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${selectedFields.link
                         ? "bg-blue-600 border-blue-600"
                         : "border-gray-300"
-                    }`}
+                      }`}
                   >
                     {selectedFields.link && (
                       <Check className="w-3 h-3 text-white" />

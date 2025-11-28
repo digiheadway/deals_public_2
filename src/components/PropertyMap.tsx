@@ -3,10 +3,15 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-le
 import { Property } from '../types/property';
 import { formatPrice } from '../utils/priceFormatter';
 import { formatSize } from '../utils/sizeFormatter';
-import { Navigation, Satellite } from 'lucide-react';
+import { Navigation, Satellite, MapPin, Maximize, ArrowRight } from 'lucide-react';
+
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { defaultIcon, landmarkIcon, getUserLocationIcon } from '../utils/leafletIcons';
+import { getUserLocationIcon, getPropertyTypeIcon } from '../utils/leafletIcons';
+import MarkerClusterGroup from 'react-leaflet-cluster';
+
+
+
 
 interface PropertyMapProps {
   properties: Property[];
@@ -50,7 +55,7 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
   const [mapCenter, setMapCenter] = useState<[number, number]>(center);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  
+
   // Helper function to get coordinates for a property (location first, then landmark_location as fallback)
   const getPropertyCoords = (property: Property): { coords: [number, number] | null; isLandmark: boolean } => {
     // Try exact location first
@@ -60,7 +65,7 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
         return { coords: [coords[0], coords[1]], isLandmark: false };
       }
     }
-    
+
     // Fallback to landmark_location
     if (property.landmark_location && property.landmark_location.includes(',')) {
       const coords = property.landmark_location.split(',').map((c) => parseFloat(c.trim()));
@@ -68,10 +73,10 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
         return { coords: [coords[0], coords[1]], isLandmark: true };
       }
     }
-    
+
     return { coords: null, isLandmark: false };
   };
-  
+
   // Filter properties that have either location or landmark_location
   const propertiesWithCoords = properties.filter(
     (p) => {
@@ -79,7 +84,7 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
       return coords !== null;
     }
   );
-  
+
   // Create user location icon (memoized to avoid recreating on each render)
   const userIcon = useMemo(() => getUserLocationIcon(), []);
 
@@ -143,89 +148,161 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
       >
         <MapUpdater center={mapCenter} />
         <TileLayerSwitcher isSatelliteView={isSatelliteView} />
-        {propertiesWithCoords.flatMap((property) => {
+
+        {/* Accuracy circles - rendered outside cluster group */}
+        {propertiesWithCoords.map((property) => {
           const { coords, isLandmark } = getPropertyCoords(property);
-          if (!coords) return [];
-          
+          if (!coords || isLandmark) return null;
           const radius = property.location_accuracy ? parseFloat(property.location_accuracy) || 500 : 500;
-          const markerIcon = isLandmark ? landmarkIcon : defaultIcon; // Use default icon for exact location, landmark icon for landmark
-          
-          return [
-            // Location Accuracy Radius Circle (only for exact locations)
-            !isLandmark && (
-              <Circle
-                key={`circle-${property.id}`}
-                center={coords}
-                radius={radius}
-                pathOptions={{
-                  color: '#3b82f6',
-                  fillColor: '#3b82f6',
-                  fillOpacity: 0.1,
-                  weight: 2,
-                  opacity: 0.5,
-                }}
-              />
-            ),
-            <Marker 
-              key={`marker-${property.id}`}
-              position={coords}
-              icon={markerIcon}
-            >
-              <Popup>
-                <div className="p-1.5">
-                  <h3 className="font-semibold text-xs mb-0.5">{property.type}</h3>
-                  <p className="text-xs text-gray-600 mb-1">
-                    {property.area}, {property.city}
-                  </p>
-                  <p className="text-xs font-medium text-blue-600 mb-0.5">
-                    {formatPrice(property.price_min, property.price_max, true)}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {formatSize(property.size_min, property.size_max, property.size_unit)}
-                  </p>
-                  {isLandmark ? (
-                    <>
-                      <p className="text-xs text-orange-600 mt-0.5 font-medium">
-                        Landmark Location (Approximate)
-                      </p>
-                      {property.landmark_location && (
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {property.landmark_location}
-                        </p>
-                      )}
-                      {property.landmark_location_distance && (
-                        <p className="text-xs text-blue-600 mt-0.5">
-                          Distance: {property.landmark_location_distance}m
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    property.location_accuracy && (
-                      <p className="text-xs text-blue-600 mt-0.5">
-                        Accuracy: {property.location_accuracy}m
-                      </p>
-                    )
-                  )}
-                  {onMarkerClick && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMarkerClick(property);
-                      }}
-                      className="mt-1.5 w-full px-2 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
-                    >
-                      View Details
-                    </button>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          ].filter(Boolean); // Remove any null/undefined elements
+
+          return (
+            <Circle
+              key={`circle-${property.id}`}
+              center={coords}
+              radius={radius}
+              pathOptions={{
+                color: '#3b82f6',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.1,
+                weight: 2,
+                opacity: 0.5,
+              }}
+            />
+          );
         })}
-        
+
+        {/* Property markers with clustering */}
+        <MarkerClusterGroup
+          chunkedLoading
+          maxClusterRadius={60}
+          spiderfyOnMaxZoom={true}
+          showCoverageOnHover={false}
+          zoomToBoundsOnClick={true}
+          iconCreateFunction={(cluster: any) => {
+
+            const count = cluster.getChildCount();
+            let sizeClass = 'w-10 h-10 text-sm';
+
+            if (count > 100) {
+              sizeClass = 'w-14 h-14 text-base';
+            } else if (count > 10) {
+              sizeClass = 'w-12 h-12 text-sm';
+            }
+
+            return L.divIcon({
+              html: `<div class="${sizeClass} flex items-center justify-center bg-blue-600 text-white rounded-full border-4 border-white shadow-lg font-bold">${count}</div>`,
+              className: 'custom-cluster-icon',
+              iconSize: L.point(40, 40, true),
+            });
+          }}
+
+        >
+          {propertiesWithCoords.map((property) => {
+            const { coords, isLandmark } = getPropertyCoords(property);
+            if (!coords) return null;
+            const markerIcon = getPropertyTypeIcon(property.type, isLandmark);
+
+            return (
+              <Marker
+                key={`marker-${property.id}`}
+                position={coords}
+                icon={markerIcon}
+              >
+                <Popup>
+                  <div className="w-full">
+                    {/* Header with Type and Price */}
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex flex-col gap-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wide leading-tight">
+                          {property.type}
+                        </h3>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700 whitespace-nowrap">
+                          {formatPrice(property.price_min, property.price_max, true)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Body with Details */}
+                    <div className="p-4 space-y-3">
+                      {/* Location */}
+                      <div className="flex items-start gap-2.5">
+                        <div className="mt-0.5 p-1 bg-blue-50 rounded-full shrink-0">
+                          <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {property.area}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {property.city}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Size */}
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1 bg-purple-50 rounded-full shrink-0">
+                          <Maximize className="w-3.5 h-3.5 text-purple-600" />
+                        </div>
+                        <p className="text-sm text-gray-700 font-medium">
+                          {formatSize(property.size_min, property.size_max, property.size_unit)}
+                        </p>
+                      </div>
+
+                      {/* Landmark / Accuracy Info */}
+                      {(isLandmark || property.location_accuracy) && (
+                        <div className="pt-2 mt-1 border-t border-gray-100">
+                          {isLandmark ? (
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium text-orange-600 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                                Approximate Location
+                              </p>
+                              {property.landmark_location && (
+                                <p className="text-xs text-gray-500 pl-3">
+                                  Near {property.landmark_location}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            property.location_accuracy && (
+                              <p className="text-xs text-green-600 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                Exact Location (±{property.location_accuracy}m)
+                              </p>
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Footer Action */}
+                    {onMarkerClick && (
+                      <div className="px-4 pb-4 pt-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMarkerClick(property);
+                          }}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm hover:shadow active:scale-[0.98]"
+                        >
+                          View Details
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </Popup>
+
+              </Marker>
+            );
+          })}
+        </MarkerClusterGroup>
+
+
         {/* User Location Marker */}
         {userLocation && (
-          <Marker 
+          <Marker
             key={`user-location-${userLocation[0]}-${userLocation[1]}`}
             position={userLocation}
             icon={userIcon}
@@ -258,15 +335,14 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
             // Save preference immediately
             localStorage.setItem('mapViewPreference', newView ? 'satellite' : 'map');
           }}
-          className={`absolute top-2 right-2 pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg shadow-lg transition-colors ${
-            isSatelliteView
-              ? 'bg-green-600 text-white hover:bg-green-700'
-              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-          }`}
+          className={`absolute top-2 right-2 pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg shadow-lg transition-colors ${isSatelliteView
+            ? 'bg-green-600 text-white hover:bg-green-700'
+            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+            }`}
           title={isSatelliteView ? 'Switch to Map View' : 'Switch to Satellite View'}
         >
-          <Satellite 
-            className="w-4 h-4 flex-shrink-0" 
+          <Satellite
+            className="w-4 h-4 flex-shrink-0"
             strokeWidth={2.5}
           />
           <span className="hidden sm:inline">{isSatelliteView ? 'Satellite' : 'Map'}</span>
@@ -280,8 +356,8 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
           className="absolute bottom-2 right-2 pointer-events-auto flex items-center justify-center w-10 h-10 bg-white text-blue-600 hover:bg-blue-50 rounded-lg shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
           title="Get Current Location"
         >
-          <Navigation 
-            className={`w-5 h-5 flex-shrink-0 ${isGettingLocation ? 'animate-spin' : ''}`} 
+          <Navigation
+            className={`w-5 h-5 flex-shrink-0 ${isGettingLocation ? 'animate-spin' : ''}`}
             strokeWidth={2.5}
           />
         </button>

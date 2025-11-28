@@ -7,6 +7,7 @@
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -18,6 +19,7 @@
     transform: translateY(100%);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -29,6 +31,7 @@
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -51,6 +54,7 @@
   0% {
     background-position: -1000px 0;
   }
+
   100% {
     background-position: 1000px 0;
   }
@@ -58,13 +62,11 @@
 
 .animate-shimmer {
   animation: shimmer 2s infinite linear;
-  background: linear-gradient(
-    to right,
-    #f0f0f0 0%,
-    #e0e0e0 20%,
-    #f0f0f0 40%,
-    #f0f0f0 100%
-  );
+  background: linear-gradient(to right,
+      #f0f0f0 0%,
+      #e0e0e0 20%,
+      #f0f0f0 40%,
+      #f0f0f0 100%);
   background-size: 1000px 100%;
 }
 
@@ -73,6 +75,7 @@
   .mobile-modal-container {
     max-height: 100dvh;
   }
+
   .mobile-modal-content {
     max-height: calc(100dvh - 2rem);
   }
@@ -83,6 +86,7 @@
     max-height: -webkit-fill-available;
     max-height: 100vh;
   }
+
   .mobile-modal-content {
     max-height: calc(-webkit-fill-available - 2rem);
     max-height: calc(100vh - 2rem);
@@ -93,13 +97,17 @@
 
 /* Hide scrollbar but keep scrolling functionality */
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
-  -webkit-overflow-scrolling: touch;  /* Smooth scrolling on iOS */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+  -webkit-overflow-scrolling: touch;
+  /* Smooth scrolling on iOS */
 }
 
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari and Opera */
+  display: none;
+  /* Chrome, Safari and Opera */
 }
 
 /* Hide browser loading progress bar and any loading indicators */
@@ -128,4 +136,63 @@ body::after,
 html::before,
 html::after {
   content: none !important;
+}
+
+/* Custom marker cluster styles */
+.custom-cluster-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.custom-cluster-icon div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hide default cluster background */
+.marker-cluster {
+  background: transparent !important;
+}
+
+.marker-cluster div {
+  background: transparent !important;
+}
+
+/* Custom Leaflet Popup Styles */
+.leaflet-popup-content-wrapper {
+  padding: 0 !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  width: 280px !important;
+}
+
+.leaflet-popup-tip {
+  background: white !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  top: 8px !important;
+  right: 8px !important;
+  color: #6b7280 !important;
+  padding: 4px !important;
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 16px !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 9999px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #111827 !important;
+  background: white !important;
 }

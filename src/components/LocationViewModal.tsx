@@ -5,7 +5,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, Polyline } from
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
-import { privateLocationIcon, landmarkIcon, getUserLocationIcon } from '../utils/leafletIcons';
+import { landmarkIcon, getUserLocationIcon, getPropertyTypeIcon } from '../utils/leafletIcons';
+
 
 interface LocationViewModalProps {
   propertyLocation: { lat: number; lng: number };
@@ -36,7 +37,7 @@ function TileLayerSwitcher({ isSatelliteView }: { isSatelliteView: boolean }) {
 // Component to update map bounds to show property, landmark, and user location
 function MapBoundsUpdater({ propertyLocation, landmarkLocation, userLocation, hasUserLocation, isInitialLoad, shouldUpdateBounds }: { propertyLocation: [number, number]; landmarkLocation: [number, number] | null; userLocation: [number, number] | null; hasUserLocation: boolean; isInitialLoad: boolean; shouldUpdateBounds: boolean }) {
   const map = useMap();
-  
+
   useEffect(() => {
     const invalidateSize = () => {
       try {
@@ -47,26 +48,26 @@ function MapBoundsUpdater({ propertyLocation, landmarkLocation, userLocation, ha
     };
 
     invalidateSize();
-    
+
     const timers = [
       setTimeout(invalidateSize, 100),
       setTimeout(invalidateSize, 300),
       setTimeout(invalidateSize, 500),
     ];
-    
+
     if (isInitialLoad || shouldUpdateBounds) {
       const updateBounds = () => {
         try {
           const locationsToFit: [number, number][] = [propertyLocation];
-          
+
           if (landmarkLocation) {
             locationsToFit.push(landmarkLocation);
           }
-          
+
           if (hasUserLocation && userLocation) {
             locationsToFit.push(userLocation);
           }
-          
+
           if (locationsToFit.length > 1) {
             const bounds = L.latLngBounds(locationsToFit);
             map.fitBounds(bounds, { padding: [50, 50] });
@@ -78,7 +79,7 @@ function MapBoundsUpdater({ propertyLocation, landmarkLocation, userLocation, ha
           console.log('Map bounds update error:', e);
         }
       };
-      
+
       setTimeout(updateBounds, isInitialLoad ? 400 : 100);
     }
 
@@ -86,14 +87,14 @@ function MapBoundsUpdater({ propertyLocation, landmarkLocation, userLocation, ha
       timers.forEach(timer => clearTimeout(timer));
     };
   }, [propertyLocation, landmarkLocation, userLocation, hasUserLocation, isInitialLoad, shouldUpdateBounds, map]);
-  
+
   return null;
 }
 
 // Component to ensure user location marker is visible
 function UserLocationMarkerUpdater({ userLocation }: { userLocation: [number, number] | null }) {
   const map = useMap();
-  
+
   useEffect(() => {
     if (userLocation) {
       console.log('UserLocationMarkerUpdater: userLocation set, invalidating map');
@@ -106,7 +107,7 @@ function UserLocationMarkerUpdater({ userLocation }: { userLocation: [number, nu
       }, 200);
     }
   }, [userLocation, map]);
-  
+
   return null;
 }
 
@@ -127,12 +128,12 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
     const saved = localStorage.getItem('mapViewPreference');
     return saved === 'satellite';
   });
-  
+
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [shouldUpdateBounds, setShouldUpdateBounds] = useState(false);
-  
+
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
       alert('Geolocation is not supported by your browser');
@@ -150,7 +151,7 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
         setIsGettingLocation(false);
         setIsInitialLoad(false);
         setShouldUpdateBounds(true);
-        
+
         // Reset the flag after a short delay
         setTimeout(() => {
           setShouldUpdateBounds(false);
@@ -182,7 +183,7 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
       }
     );
   };
-  
+
   const mapCenter: [number, number] = (() => {
     if (landmarkLocationCoords) {
       return [
@@ -217,7 +218,7 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
         const leafletElement = element as any;
         if (leafletElement._leaflet_id) {
           const allMaps = (L as any).map._instances || {};
-          const mapInstance = Object.values(allMaps).find((map: any) => 
+          const mapInstance = Object.values(allMaps).find((map: any) =>
             map.getContainer() === element
           ) as any;
           if (mapInstance) {
@@ -232,7 +233,7 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
 
   useEffect(() => {
     setIsGettingLocation(true);
-    
+
     if (!navigator.geolocation) {
       setIsGettingLocation(false);
       setIsInitialLoad(false);
@@ -275,7 +276,7 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
 
   // Use icons from utility (memoized to avoid recreating on each render)
   const userIcon = useMemo(() => getUserLocationIcon(), []);
-  
+
   // Debug: Log when userLocation changes and invalidate map
   useEffect(() => {
     if (userLocation) {
@@ -319,7 +320,7 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
                 </div>
               </div>
             )}
-            
+
             <MapContainer
               center={mapCenter}
               zoom={userLocation ? 13 : 15}
@@ -327,132 +328,132 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
               scrollWheelZoom={true}
               style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1, height: '100%', width: '100%' }}
             >
-                <MapBoundsUpdater 
-                  propertyLocation={[propertyLocation.lat, propertyLocation.lng]} 
-                  landmarkLocation={landmarkLocationCoords}
-                  userLocation={userLocation}
-                  hasUserLocation={!!userLocation}
-                  isInitialLoad={isInitialLoad}
-                  shouldUpdateBounds={shouldUpdateBounds}
+              <MapBoundsUpdater
+                propertyLocation={[propertyLocation.lat, propertyLocation.lng]}
+                landmarkLocation={landmarkLocationCoords}
+                userLocation={userLocation}
+                hasUserLocation={!!userLocation}
+                isInitialLoad={isInitialLoad}
+                shouldUpdateBounds={shouldUpdateBounds}
+              />
+              <UserLocationMarkerUpdater userLocation={userLocation} />
+              <TileLayerSwitcher isSatelliteView={isSatelliteView} />
+
+              {landmarkLocationCoords && (
+                <Polyline
+                  positions={[[propertyLocation.lat, propertyLocation.lng], landmarkLocationCoords]}
+                  pathOptions={{
+                    color: '#3b82f6',
+                    weight: 2,
+                    opacity: 0.6,
+                    dashArray: '10, 5',
+                  }}
                 />
-                <UserLocationMarkerUpdater userLocation={userLocation} />
-                <TileLayerSwitcher isSatelliteView={isSatelliteView} />
-                
-                {landmarkLocationCoords && (
-                  <Polyline
-                    positions={[[propertyLocation.lat, propertyLocation.lng], landmarkLocationCoords]}
-                    pathOptions={{
-                      color: '#3b82f6',
-                      weight: 2,
-                      opacity: 0.6,
-                      dashArray: '10, 5',
-                    }}
-                  />
-                )}
-                
-                {property.location_accuracy && (
-                  <Circle
-                    center={[propertyLocation.lat, propertyLocation.lng]}
-                    radius={parseFloat(property.location_accuracy) || 500}
-                    pathOptions={{
-                      color: '#22c55e',
-                      fillColor: '#22c55e',
-                      fillOpacity: 0.1,
-                      weight: 2,
-                      opacity: 0.5,
-                    }}
-                  />
-                )}
-                
-                <Marker 
-                  position={[propertyLocation.lat, propertyLocation.lng]}
-                  icon={privateLocationIcon}
+              )}
+
+              {property.location_accuracy && (
+                <Circle
+                  center={[propertyLocation.lat, propertyLocation.lng]}
+                  radius={parseFloat(property.location_accuracy) || 500}
+                  pathOptions={{
+                    color: '#22c55e',
+                    fillColor: '#22c55e',
+                    fillOpacity: 0.1,
+                    weight: 2,
+                    opacity: 0.5,
+                  }}
+                />
+              )}
+
+              <Marker
+                position={[propertyLocation.lat, propertyLocation.lng]}
+                icon={getPropertyTypeIcon(property.type, false)}
+              >
+                <Popup>
+                  <div className="p-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lock className="w-4 h-4 text-green-700" />
+                      <h3 className="font-semibold text-sm">Exact Location (Private)</h3>
+                    </div>
+                    <p className="text-xs text-gray-600 mb-1">
+                      {property.area}, {property.city}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {propertyLocation.lat.toFixed(6)}, {propertyLocation.lng.toFixed(6)}
+                    </p>
+                    {property.location_accuracy && (
+                      <p className="text-xs text-green-700 mt-1">
+                        Accuracy: {property.location_accuracy}m
+                      </p>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+
+              {landmarkLocationCoords && (
+                <Marker
+                  position={landmarkLocationCoords}
+                  icon={landmarkIcon}
                 >
                   <Popup>
                     <div className="p-2">
                       <div className="flex items-center gap-2 mb-1">
-                        <Lock className="w-4 h-4 text-green-700" />
-                        <h3 className="font-semibold text-sm">Exact Location (Private)</h3>
+                        <Globe className="w-4 h-4 text-blue-600" />
+                        <h3 className="font-semibold text-sm">Landmark Location (Public)</h3>
                       </div>
                       <p className="text-xs text-gray-600 mb-1">
                         {property.area}, {property.city}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {propertyLocation.lat.toFixed(6)}, {propertyLocation.lng.toFixed(6)}
+                        {landmarkLocationCoords[0].toFixed(6)}, {landmarkLocationCoords[1].toFixed(6)}
                       </p>
-                      {property.location_accuracy && (
-                        <p className="text-xs text-green-700 mt-1">
-                          Accuracy: {property.location_accuracy}m
+                      {property.landmark_location_distance && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Distance: {property.landmark_location_distance}m
                         </p>
                       )}
                     </div>
                   </Popup>
                 </Marker>
+              )}
 
-                {landmarkLocationCoords && (
-                  <Marker 
-                    position={landmarkLocationCoords}
-                    icon={landmarkIcon}
-                  >
-                    <Popup>
-                      <div className="p-2">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Globe className="w-4 h-4 text-blue-600" />
-                          <h3 className="font-semibold text-sm">Landmark Location (Public)</h3>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-1">
-                          {property.area}, {property.city}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {landmarkLocationCoords[0].toFixed(6)}, {landmarkLocationCoords[1].toFixed(6)}
-                        </p>
-                        {property.landmark_location_distance && (
-                          <p className="text-xs text-blue-600 mt-1">
-                            Distance: {property.landmark_location_distance}m
-                          </p>
-                        )}
-                      </div>
-                    </Popup>
-                  </Marker>
-                )}
-
-                {userLocation && (
-                  <Marker 
-                    key={`user-location-${userLocation[0]}-${userLocation[1]}`}
-                    position={userLocation}
-                    icon={userIcon}
-                    zIndexOffset={1000}
-                    riseOnHover={true}
-                    eventHandlers={{
-                      add: (e) => {
-                        console.log('User location marker added to map at:', userLocation);
-                        // Force the marker to be visible
-                        const marker = e.target;
-                        if (marker && marker.getElement) {
-                          const element = marker.getElement();
-                          if (element) {
-                            element.style.zIndex = '1000';
-                            element.style.position = 'relative';
-                          }
+              {userLocation && (
+                <Marker
+                  key={`user-location-${userLocation[0]}-${userLocation[1]}`}
+                  position={userLocation}
+                  icon={userIcon}
+                  zIndexOffset={1000}
+                  riseOnHover={true}
+                  eventHandlers={{
+                    add: (e) => {
+                      console.log('User location marker added to map at:', userLocation);
+                      // Force the marker to be visible
+                      const marker = e.target;
+                      if (marker && marker.getElement) {
+                        const element = marker.getElement();
+                        if (element) {
+                          element.style.zIndex = '1000';
+                          element.style.position = 'relative';
                         }
-                      },
-                      click: () => {
-                        console.log('User location marker clicked');
                       }
-                    }}
-                  >
-                    <Popup>
-                      <div className="p-2">
-                        <h3 className="font-semibold text-sm mb-1">Your Location</h3>
-                        <p className="text-xs text-gray-500">
-                          {userLocation[0].toFixed(6)}, {userLocation[1].toFixed(6)}
-                        </p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                )}
+                    },
+                    click: () => {
+                      console.log('User location marker clicked');
+                    }
+                  }}
+                >
+                  <Popup>
+                    <div className="p-2">
+                      <h3 className="font-semibold text-sm mb-1">Your Location</h3>
+                      <p className="text-xs text-gray-500">
+                        {userLocation[0].toFixed(6)}, {userLocation[1].toFixed(6)}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
             </MapContainer>
-            
+
             <div className="absolute inset-0 pointer-events-none z-[10]" style={{ pointerEvents: 'none' }}>
               {/* Satellite View Toggle Button - Top Right */}
               <button
@@ -471,20 +472,19 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
                     }
                   }, 100);
                 }}
-                className={`absolute top-2 right-2 pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg shadow-lg transition-colors ${
-                  isSatelliteView
-                    ? 'bg-green-600 text-white hover:bg-green-700'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                }`}
+                className={`absolute top-2 right-2 pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg shadow-lg transition-colors ${isSatelliteView
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                  }`}
                 title={isSatelliteView ? 'Switch to Map View' : 'Switch to Satellite View'}
               >
-                <Satellite 
-                  className="w-4 h-4 flex-shrink-0" 
+                <Satellite
+                  className="w-4 h-4 flex-shrink-0"
                   strokeWidth={2.5}
                 />
                 <span className="hidden sm:inline">{isSatelliteView ? 'Satellite' : 'Map'}</span>
               </button>
-              
+
               {/* GPS/Current Location Button - Bottom Right */}
               <button
                 type="button"
@@ -493,8 +493,8 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
                 className="absolute bottom-2 right-2 pointer-events-auto flex items-center justify-center w-10 h-10 bg-white text-blue-600 hover:bg-blue-50 rounded-lg shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
                 title="Get Current Location"
               >
-                <Navigation 
-                  className={`w-5 h-5 flex-shrink-0 ${isGettingLocation ? 'animate-spin' : ''}`} 
+                <Navigation
+                  className={`w-5 h-5 flex-shrink-0 ${isGettingLocation ? 'animate-spin' : ''}`}
                   strokeWidth={2.5}
                 />
               </button>
