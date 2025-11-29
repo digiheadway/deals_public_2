@@ -354,7 +354,7 @@ export function LocationViewModal({ propertyLocation, property, onClose, onOpenI
               {property.location_accuracy && (
                 <Circle
                   center={[propertyLocation.lat, propertyLocation.lng]}
-                  radius={parseFloat(property.location_accuracy) || 500}
+                  radius={!isNaN(parseFloat(property.location_accuracy)) ? parseFloat(property.location_accuracy) : 500}
                   pathOptions={{
                     color: '#22c55e',
                     fillColor: '#22c55e',

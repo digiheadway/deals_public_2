@@ -153,7 +153,8 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
         {propertiesWithCoords.map((property) => {
           const { coords, isLandmark } = getPropertyCoords(property);
           if (!coords || isLandmark) return null;
-          const radius = property.location_accuracy ? parseFloat(property.location_accuracy) || 500 : 500;
+          const accuracy = property.location_accuracy ? parseFloat(property.location_accuracy) : NaN;
+          const radius = !isNaN(accuracy) ? accuracy : 500;
 
           return (
             <Circle
