@@ -309,7 +309,7 @@ export function AuthPage({ onLogin, onGoToHome }: AuthPageProps) {
                       onClick={() => {
                         if (showResetContact) {
                           window.location.href =
-                            "https://wa.me/9138331357?text=Hello%20Support,%20I%20need%20to%20reset%20my%20PIN";
+                            "https://wa.me/919138331357?text=Hello%20Support,%20I%20need%20to%20reset%20my%20PIN";
                         } else {
                           setShowResetContact(true);
                         }
