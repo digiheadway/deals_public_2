@@ -20,6 +20,7 @@ interface AuthPageProps {
 export function AuthPage({ onLogin, onGoToHome }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [showPin, setShowPin] = useState(false);
+  const [showResetContact, setShowResetContact] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -306,13 +307,23 @@ export function AuthPage({ onLogin, onGoToHome }: AuthPageProps) {
                     <button
                       type="button"
                       onClick={() => {
-                        window.location.href =
-                          "https://wa.me/9138331357?text=Hello%20Support,%20I%20need%20to%20reset%20my%20PIN";
+                        if (showResetContact) {
+                          window.location.href =
+                            "https://wa.me/9138331357?text=Hello%20Support,%20I%20need%20to%20reset%20my%20PIN";
+                        } else {
+                          setShowResetContact(true);
+                        }
                       }}
                       className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                     >
-                      Contact Support to Reset Pin.{" "}
-                      <span className="underline">Contact Now</span>
+                      {showResetContact ? (
+                        <>
+                          Contact Support to Reset Pin.{" "}
+                          <span className="underline">Contact Now</span>
+                        </>
+                      ) : (
+                        "Reset Pin"
+                      )}
                     </button>
                   </div>
 
@@ -486,9 +497,8 @@ export function AuthPage({ onLogin, onGoToHome }: AuthPageProps) {
                       Additional Details (Optional)
                     </span>
                     <ChevronDown
-                      className={`w-5 h-5 text-gray-400 transition-transform ${
-                        showAdditionalDetails ? "rotate-180" : ""
-                      }`}
+                      className={`w-5 h-5 text-gray-400 transition-transform ${showAdditionalDetails ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
                 </div>
