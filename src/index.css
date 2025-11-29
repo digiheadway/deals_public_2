@@ -169,7 +169,7 @@ html::after {
 
 .leaflet-popup-content {
   margin: 0 !important;
-  width: 280px !important;
+  max-width: 280px !important;
 }
 
 .leaflet-popup-tip {

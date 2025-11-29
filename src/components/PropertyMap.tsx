@@ -210,90 +210,61 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
                 icon={markerIcon}
               >
                 <Popup>
-                  <div className="w-full">
-                    {/* Header with Type and Price */}
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex flex-col gap-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wide leading-tight">
+                  <div className="w-[240px] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden font-sans group">
+
+                    {/* Hero Section: Price & Type */}
+                    <div className="p-4 pb-2">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
                           {property.type}
-                        </h3>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700 whitespace-nowrap">
-                          {formatPrice(property.price_min, property.price_max, true)}
+                        </span>
+                        {/* Status indicator for accuracy */}
+                        <div className={`w-2 h-2 rounded-full ${isLandmark ? 'bg-orange-400' : 'bg-green-500'}`} title={isLandmark ? 'Approximate Location' : 'Exact Location'} />
+                      </div>
+
+                      <h2 className="text-lg font-bold text-gray-900 tracking-tight">
+                        {formatPrice(property.price_min, property.price_max, true)}
+                      </h2>
+                      <div className="flex items-center text-xs text-gray-500 mt-1 truncate">
+                        <MapPin className="w-3 h-3 mr-1 text-gray-400" />
+                        {property.area}, {property.city}
+                      </div>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="px-4 py-3 border-t border-gray-50 bg-gray-50/50 grid grid-cols-2 gap-2">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-gray-400 uppercase font-semibold">Size</span>
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700">
+                          <Maximize className="w-3 h-3 text-gray-400" />
+                          {formatSize(property.size_min, property.size_max, property.size_unit)}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-gray-400 uppercase font-semibold">Accuracy</span>
+                        <span className={`text-[11px] font-medium truncate ${isLandmark ? 'text-orange-600' : 'text-green-600'}`}>
+                          {isLandmark ? 'Nearby Landmark' : `Exact (${property.location_accuracy} meter)`}
                         </span>
                       </div>
                     </div>
 
-                    {/* Body with Details */}
-                    <div className="p-4 space-y-3">
-                      {/* Location */}
-                      <div className="flex items-start gap-2.5">
-                        <div className="mt-0.5 p-1 bg-blue-50 rounded-full shrink-0">
-                          <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {property.area}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {property.city}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Size */}
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1 bg-purple-50 rounded-full shrink-0">
-                          <Maximize className="w-3.5 h-3.5 text-purple-600" />
-                        </div>
-                        <p className="text-sm text-gray-700 font-medium">
-                          {formatSize(property.size_min, property.size_max, property.size_unit)}
-                        </p>
-                      </div>
-
-                      {/* Landmark / Accuracy Info */}
-                      {(isLandmark || property.location_accuracy) && (
-                        <div className="pt-2 mt-1 border-t border-gray-100">
-                          {isLandmark ? (
-                            <div className="space-y-1">
-                              <p className="text-xs font-medium text-orange-600 flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
-                                Approximate Location
-                              </p>
-                              {property.landmark_location && (
-                                <p className="text-xs text-gray-500 pl-3">
-                                  Near {property.landmark_location}
-                                </p>
-                              )}
-                            </div>
-                          ) : (
-                            property.location_accuracy && (
-                              <p className="text-xs text-green-600 flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                                Exact Location (±{property.location_accuracy}m)
-                              </p>
-                            )
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Footer Action */}
+                    {/* Conditional Footer (Hidden by default, slides up or just sits cleaner) */}
                     {onMarkerClick && (
-                      <div className="px-4 pb-4 pt-0">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onMarkerClick(property);
-                          }}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm hover:shadow active:scale-[0.98]"
-                        >
-                          View Details
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMarkerClick(property);
+                        }}
+                        className="w-full py-3 bg-white hover:bg-slate-50 text-blue-600 text-xs font-bold border-t border-gray-100 transition-colors flex items-center justify-center gap-2"
+                      >
+                        View Full Details
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
                     )}
                   </div>
                 </Popup>
+
 
               </Marker>
             );
