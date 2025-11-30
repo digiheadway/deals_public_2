@@ -77,7 +77,7 @@ function App() {
       if (saved && (saved === "all" || saved === "my" || saved === "public")) {
         return saved as FilterType;
       }
-    } catch {}
+    } catch { }
     return "all";
   };
 
@@ -86,7 +86,7 @@ function App() {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.SEARCH_COLUMN);
       return saved || "general";
-    } catch {}
+    } catch { }
     return "general";
   };
 
@@ -103,7 +103,7 @@ function App() {
           )
         ) as FilterOptions;
       }
-    } catch {}
+    } catch { }
     return {};
   };
 
@@ -111,13 +111,21 @@ function App() {
   const loadPersistedSearchQuery = (): string => {
     try {
       return localStorage.getItem(STORAGE_KEYS.SEARCH_QUERY) || "";
-    } catch {}
+    } catch { }
     return "";
   };
 
   const [activeFilter, setActiveFilter] = useState<FilterType>(
     loadPersistedFilter()
   );
+
+  // Ensure activeFilter is valid for guest users
+  useEffect(() => {
+    if (ownerId === 0 && activeFilter === 'my') {
+      setActiveFilter('all');
+    }
+  }, [ownerId, activeFilter]);
+
   const [myProperties, setMyProperties] = useState<Property[]>([]);
   const [publicProperties, setPublicProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
@@ -170,27 +178,19 @@ function App() {
   const [viewMode, setViewMode] = useState<"list" | "map">("list"); // View mode for list or map
   const filterMenuRef = useRef<HTMLDivElement>(null);
 
-  // Clear any persisted filters/search on mount for customer-side app
-  useEffect(() => {
-    // Clear filters and search to start fresh
-    setActiveFilters({});
-    setSearchQuery("");
-    try {
-      localStorage.removeItem(STORAGE_KEYS.FILTERS);
-      localStorage.removeItem(STORAGE_KEYS.SEARCH_QUERY);
-    } catch (error) {
-      console.error("Failed to clear persisted filters:", error);
-    }
-  }, []); // Run only once on mount
+  // Note: Do NOT clear filters on mount - SearchFilter component sets a default city filter
+  // that should be applied on initial load. Clearing it here would cause the API to fetch
+  // all properties without the city parameter initially.
 
   const loadMyProperties = useCallback(
     async (paginationOptions?: PaginationOptions) => {
-      if (!ownerId || ownerId <= 0) return;
+      if (ownerId < 0) return;
       try {
         const paginationParams = paginationOptions || pagination;
         const response = await propertyApi.getUserProperties(
           ownerId,
-          paginationParams
+          paginationParams,
+          viewMode === 'map' // forMap - only fetch properties with location data when in map view
         );
         setMyProperties(response.data);
         setPaginationMeta(response.meta);
@@ -200,17 +200,18 @@ function App() {
         setToast({ message: errorMessage, type: "error" });
       }
     },
-    [ownerId, pagination]
+    [ownerId, pagination, viewMode]
   );
 
   const loadPublicProperties = useCallback(
     async (paginationOptions?: PaginationOptions) => {
-      if (!ownerId || ownerId <= 0) return;
+      if (ownerId < 0) return;
       try {
         const paginationParams = paginationOptions || pagination;
         const response = await propertyApi.getPublicProperties(
           ownerId,
-          paginationParams
+          paginationParams,
+          viewMode === 'map' // forMap - only fetch properties with location data when in map view
         );
         setPublicProperties(response.data);
         setPaginationMeta(response.meta);
@@ -222,7 +223,7 @@ function App() {
         setToast({ message: errorMessage, type: "error" });
       }
     },
-    [ownerId, pagination]
+    [ownerId, pagination, viewMode]
   );
 
   useEffect(() => {
@@ -365,7 +366,8 @@ function App() {
             }
             const response = await propertyApi.getAllProperties(
               ownerId,
-              normalizedPagination
+              normalizedPagination,
+              viewMode === 'map' // forMap - only fetch properties with location data when in map view
             );
             // Check again after async operation
             if (requestIdRef.current !== currentRequestId) {
@@ -551,10 +553,10 @@ function App() {
         currentFilter === "my"
           ? "mine"
           : currentFilter === "public"
-          ? "others"
-          : currentFilter === "all"
-          ? "both"
-          : "both";
+            ? "others"
+            : currentFilter === "all"
+              ? "both"
+              : "both";
 
       // Sort filter keys to ensure consistent stringification
       const sortedFilters = Object.keys(activeFilters)
@@ -711,14 +713,18 @@ function App() {
           return false;
         if (
           filters.tags &&
-          !property.tags?.toLowerCase().includes(filters.tags.toLowerCase())
+          !property.tags?.toLowerCase().includes(
+            typeof filters.tags === 'string' ? filters.tags.toLowerCase() : filters.tags.join(',').toLowerCase()
+          )
         )
           return false;
         if (
           filters.highlights &&
           !property.highlights
             ?.toLowerCase()
-            .includes(filters.highlights.toLowerCase())
+            .includes(
+              typeof filters.highlights === 'string' ? filters.highlights.toLowerCase() : filters.highlights.join(',').toLowerCase()
+            )
         )
           return false;
         return true;
@@ -745,10 +751,10 @@ function App() {
         activeFilter === "my"
           ? "mine"
           : activeFilter === "public"
-          ? "others"
-          : activeFilter === "all"
-          ? "both"
-          : "both";
+            ? "others"
+            : activeFilter === "all"
+              ? "both"
+              : "both";
 
       const hasActiveFilters = Object.keys(activeFilters).length > 0;
       const hasActiveSearch = searchQuery.trim().length > 0;
@@ -764,7 +770,9 @@ function App() {
               listParam,
               searchQuery,
               searchColumn,
-              pagination
+              pagination,
+              viewMode === 'map', // forMap - only fetch properties with location data when in map view
+              undefined // filters
             );
             let filtered = searchResponse.data;
             // Apply additional filters client-side if any
@@ -792,7 +800,8 @@ function App() {
               ownerId,
               listParam,
               activeFilters,
-              pagination
+              pagination,
+              viewMode === 'map' // forMap - only fetch properties with location data when in map view
             );
             setFilteredProperties(filterResponse.data);
             setPaginationMeta(filterResponse.meta);
@@ -829,7 +838,8 @@ function App() {
       if (activeFilter === "my") {
         const response = await propertyApi.getUserProperties(
           ownerId,
-          pagination
+          pagination,
+          viewMode === 'map' // forMap - only fetch properties with location data when in map view
         );
         myProps = response.data;
         setMyProperties(myProps);
@@ -838,7 +848,8 @@ function App() {
       } else if (activeFilter === "public") {
         const response = await propertyApi.getPublicProperties(
           ownerId,
-          pagination
+          pagination,
+          viewMode === 'map' // forMap - only fetch properties with location data when in map view
         );
         publicProps = response.data;
         setPublicProperties(publicProps);
@@ -848,7 +859,8 @@ function App() {
         // Use getAllProperties endpoint for efficiency (single API call)
         const response = await propertyApi.getAllProperties(
           ownerId,
-          pagination
+          pagination,
+          viewMode === 'map' // forMap - only fetch properties with location data when in map view
         );
         const allProps = response.data;
         // Split results: my properties have owner_id === ownerId, public properties have owner_id !== ownerId
@@ -868,8 +880,8 @@ function App() {
         activeFilter === "all"
           ? [...myProps, ...publicProps]
           : activeFilter === "my"
-          ? myProps
-          : publicProps;
+            ? myProps
+            : publicProps;
 
       // Update selectedProperty if modal is open and updateSelectedProperty is true
       if (updateSelectedProperty && selectedProperty) {
@@ -1074,9 +1086,8 @@ function App() {
     // For navigator.share, don't include URL in text (it's passed separately)
     // For clipboard fallback, include URL in text
     const textForShare = `${property.type} in ${property.area}, ${property.city}\n${property.description}\nSize: ${sizeText}\nPrice: ${priceText}`;
-    const textForClipboard = `${textForShare}${
-      shareUrl ? `\n\nView: ${shareUrl}` : ""
-    }`;
+    const textForClipboard = `${textForShare}${shareUrl ? `\n\nView: ${shareUrl}` : ""
+      }`;
 
     if (navigator.share) {
       try {
@@ -1115,10 +1126,10 @@ function App() {
         currentFilter === "my"
           ? "mine"
           : currentFilter === "public"
-          ? "others"
-          : currentFilter === "all"
-          ? "both"
-          : "both";
+            ? "others"
+            : currentFilter === "all"
+              ? "both"
+              : "both";
 
       // Use the current search column if column parameter is not provided
       const currentColumn = column !== undefined ? column : searchColumn;
@@ -1193,7 +1204,7 @@ function App() {
             query,
             currentColumn,
             { page: normalizedPage, per_page: normalizedPerPage },
-            false, // forMap
+            viewMode === 'map', // forMap - only fetch properties with location data when in map view
             Object.keys(activeFilters).length > 0 ? activeFilters : undefined // Pass filters to backend
           );
 
@@ -1213,7 +1224,8 @@ function App() {
             ownerId,
             listParam,
             activeFilters,
-            { page: normalizedPage, per_page: normalizedPerPage }
+            { page: normalizedPage, per_page: normalizedPerPage },
+            viewMode === 'map' // forMap - only fetch properties with location data when in map view
           );
 
           // Check again after async operation
@@ -1280,10 +1292,10 @@ function App() {
         currentFilter === "my"
           ? "mine"
           : currentFilter === "public"
-          ? "others"
-          : currentFilter === "all"
-          ? "both"
-          : "both";
+            ? "others"
+            : currentFilter === "all"
+              ? "both"
+              : "both";
 
       // If no filters and no search query, show default list
       if (Object.keys(filters).length === 0 && !searchQuery.trim()) {
@@ -1355,7 +1367,7 @@ function App() {
             searchQuery,
             searchColumn,
             { page: normalizedPage, per_page: normalizedPerPage },
-            false, // forMap
+            viewMode === 'map', // forMap - only fetch properties with location data when in map view
             Object.keys(filters).length > 0 ? filters : undefined // Pass filters to backend
           );
 
@@ -1374,7 +1386,8 @@ function App() {
             ownerId,
             listParam,
             filters,
-            { page: normalizedPage, per_page: normalizedPerPage }
+            { page: normalizedPage, per_page: normalizedPerPage },
+            viewMode === 'map' // forMap - only fetch properties with location data when in map view
           );
 
           // Check again after async operation
@@ -1542,7 +1555,7 @@ function App() {
                   setShowLandingPage(false);
                   try {
                     localStorage.setItem("has_visited_app", "true");
-                  } catch {}
+                  } catch { }
                 }}
               />
             </Suspense>
@@ -1592,16 +1605,16 @@ function App() {
                 setSelectedProperty(property);
                 setShowDetailsModal(true);
               }}
-              handleAddProperty={async () => {}} // No add functionality
-              handleEditProperty={async () => {}} // No edit functionality
-              handleDeleteProperty={async () => {}} // No delete functionality
-              handleTogglePublic={async () => {}} // No toggle public functionality
+              handleAddProperty={async () => { }} // No add functionality
+              handleEditProperty={async () => { }} // No edit functionality
+              handleDeleteProperty={async () => { }} // No delete functionality
+              handleTogglePublic={async () => { }} // No toggle public functionality
               handleShare={handleShare}
               handleAskQuestion={handleAskQuestion}
               handleContactSubmit={handleContactSubmit}
-              handleUpdateHighlightsAndTags={async () => {}} // No update functionality
-              handleUpdateLocation={async () => {}} // No update functionality
-              handleUpdateLandmarkLocation={async () => {}} // No update functionality
+              handleUpdateHighlightsAndTags={async () => { }} // No update functionality
+              handleUpdateLocation={async () => { }} // No update functionality
+              handleUpdateLandmarkLocation={async () => { }} // No update functionality
               handleClearSearchAndFilters={handleClearSearchAndFilters}
               showToast={showToast}
               searchFilterKey={searchFilterKey}
@@ -1831,8 +1844,11 @@ function MainAppContent({
 
   const baseProperties = getBaseProperties();
 
+  // Determine source properties for map
+  const sourceProperties = hasActiveSearchOrFilter ? filteredProperties : baseProperties;
+
   // Filter properties for map view - only show properties with location or landmark data
-  const propertiesForMap = baseProperties.filter((property) => {
+  const propertiesForMap = sourceProperties.filter((property) => {
     // Check if property has location coordinates (lat,long format)
     const hasLocation =
       property.location &&
@@ -1851,8 +1867,8 @@ function MainAppContent({
     viewMode === "map"
       ? propertiesForMap
       : hasActiveSearchOrFilter
-      ? filteredProperties
-      : baseProperties;
+        ? filteredProperties
+        : baseProperties;
 
   // Determine if there's a next page
   // Show pagination when pagination metadata is available (works for both base lists and filtered/search results)
@@ -1881,10 +1897,10 @@ function MainAppContent({
             activeFilter === "my"
               ? "mine"
               : activeFilter === "public"
-              ? "others"
-              : activeFilter === "all"
-              ? "both"
-              : "both";
+                ? "others"
+                : activeFilter === "all"
+                  ? "both"
+                  : "both";
 
           if (searchQuery.trim()) {
             const searchResponse = await propertyApi.searchProperties(
@@ -1892,7 +1908,9 @@ function MainAppContent({
               listParam,
               searchQuery,
               searchColumn,
-              { ...pagination, page: newPage }
+              { ...pagination, page: newPage },
+              viewMode === 'map', // forMap - only fetch properties with location data when in map view
+              Object.keys(activeFilters).length > 0 ? activeFilters : undefined
             );
             let filtered = searchResponse.data;
             if (Object.keys(activeFilters).length > 0) {
@@ -1908,7 +1926,8 @@ function MainAppContent({
               ownerId,
               listParam,
               activeFilters,
-              { ...pagination, page: newPage }
+              { ...pagination, page: newPage },
+              viewMode === 'map' // forMap - only fetch properties with location data when in map view
             );
             setFilteredProperties(filterResponse.data);
             setPaginationMeta(filterResponse.meta);
@@ -1938,10 +1957,10 @@ function MainAppContent({
             activeFilter === "my"
               ? "mine"
               : activeFilter === "public"
-              ? "others"
-              : activeFilter === "all"
-              ? "both"
-              : "both";
+                ? "others"
+                : activeFilter === "all"
+                  ? "both"
+                  : "both";
 
           if (searchQuery.trim()) {
             const searchResponse = await propertyApi.searchProperties(
@@ -1949,7 +1968,9 @@ function MainAppContent({
               listParam,
               searchQuery,
               searchColumn,
-              { ...pagination, page: newPage }
+              { ...pagination, page: newPage },
+              viewMode === 'map', // forMap - only fetch properties with location data when in map view
+              Object.keys(activeFilters).length > 0 ? activeFilters : undefined
             );
             let filtered = searchResponse.data;
             if (Object.keys(activeFilters).length > 0) {
@@ -1965,7 +1986,8 @@ function MainAppContent({
               ownerId,
               listParam,
               activeFilters,
-              { ...pagination, page: newPage }
+              { ...pagination, page: newPage },
+              viewMode === 'map' // forMap - only fetch properties with location data when in map view
             );
             setFilteredProperties(filterResponse.data);
             setPaginationMeta(filterResponse.meta);
@@ -2038,11 +2060,10 @@ function MainAppContent({
                 onClick={() =>
                   setViewMode(viewMode === "list" ? "map" : "list")
                 }
-                className={`p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors ${
-                  viewMode === "map"
-                    ? "bg-blue-50 text-blue-600"
-                    : "text-gray-600"
-                }`}
+                className={`p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors ${viewMode === "map"
+                  ? "bg-blue-50 text-blue-600"
+                  : "text-gray-600"
+                  }`}
                 title={
                   viewMode === "list"
                     ? "Switch to Map View"
@@ -2095,8 +2116,8 @@ function MainAppContent({
                       {hasActiveSearchOrFilter
                         ? "No properties found matching your search or filters."
                         : activeFilter === "my"
-                        ? "No properties yet. Add your first property!"
-                        : "No properties available"}
+                          ? "No properties yet. Add your first property!"
+                          : "No properties available"}
                     </p>
                     {hasActiveSearchOrFilter && (
                       <button
@@ -2137,8 +2158,8 @@ function MainAppContent({
                     {hasActiveSearchOrFilter
                       ? "No properties found matching your search or filters."
                       : activeFilter === "my"
-                      ? "No properties yet. Add your first property!"
-                      : "No properties available"}
+                        ? "No properties yet. Add your first property!"
+                        : "No properties available"}
                   </p>
                   {hasActiveSearchOrFilter && (
                     <button
@@ -2168,11 +2189,10 @@ function MainAppContent({
                         <button
                           onClick={handlePreviousPage}
                           disabled={!hasPreviousPage}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                            hasPreviousPage
-                              ? "bg-blue-600 text-white hover:bg-blue-700"
-                              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          }`}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${hasPreviousPage
+                            ? "bg-blue-600 text-white hover:bg-blue-700"
+                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            }`}
                         >
                           <ChevronLeft className="w-4 h-4" />
                           <span className="hidden sm:inline">Previous</span>
@@ -2203,11 +2223,10 @@ function MainAppContent({
                         <button
                           onClick={handleNextPage}
                           disabled={!hasNextPage}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                            hasNextPage
-                              ? "bg-blue-600 text-white hover:bg-blue-700"
-                              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          }`}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${hasNextPage
+                            ? "bg-blue-600 text-white hover:bg-blue-700"
+                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            }`}
                         >
                           <span className="hidden sm:inline">Next</span>
                           <ChevronRight className="w-4 h-4" />

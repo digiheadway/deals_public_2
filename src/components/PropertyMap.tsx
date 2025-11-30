@@ -244,7 +244,9 @@ export function PropertyMap({ properties, center = [29.3909, 76.9635], onMarkerC
                       <div className="flex flex-col">
                         <span className="text-[10px] text-gray-400 uppercase font-semibold">Accuracy</span>
                         <span className={`text-[11px] font-medium truncate ${isLandmark ? 'text-orange-600' : 'text-green-600'}`}>
-                          {isLandmark ? 'Nearby Landmark' : `Exact (${property.location_accuracy} meter)`}
+                          {isLandmark
+                            ? `Approx ${property.landmark_location_distance ? property.landmark_location_distance + 'm' : ''} from Landmark`
+                            : `Exact (${property.location_accuracy} meter)`}
                         </span>
                       </div>
                     </div>
