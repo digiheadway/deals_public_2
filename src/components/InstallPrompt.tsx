@@ -29,9 +29,9 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
       const isIOSStandalone = (window.navigator as any).standalone === true;
       const isStandaloneMode = isStandalone || isIOSStandalone;
-      
+
       setIsInstalled(isStandaloneMode);
-      
+
       // Check if service worker is registered (indicates PWA is set up)
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistration().then(registration => {
@@ -40,14 +40,14 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
           }
         });
       }
-      
+
       // Check localStorage for dismissed state with timestamp
       const dismissedTimestamp = localStorage.getItem('pwa-install-dismissed');
       if (dismissedTimestamp) {
         const dismissedTime = parseInt(dismissedTimestamp, 10);
         const currentTime = Date.now();
         const twoMinutesInMs = 2 * 60 * 1000;
-        
+
         if (currentTime - dismissedTime < twoMinutesInMs) {
           setIsDismissed(true);
         } else {
@@ -58,7 +58,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
     };
 
     checkIfInstalled();
-    
+
     // Check if deferredPrompt was already captured by the early script
     const checkStoredPrompt = () => {
       const storedPrompt = (window as any).deferredPrompt as BeforeInstallPromptEvent | null;
@@ -67,10 +67,10 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
         setCanInstall(true);
       }
     };
-    
+
     // Check immediately
     checkStoredPrompt();
-    
+
     // Also check after a delay to ensure service worker has time to register
     const delayedCheck = setTimeout(() => {
       checkIfInstalled();
@@ -110,7 +110,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     // Set up interval to re-check dismissal status and installability
     const checkInterval = setInterval(() => {
       const dismissedTimestamp = localStorage.getItem('pwa-install-dismissed');
@@ -118,13 +118,13 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
         const dismissedTime = parseInt(dismissedTimestamp, 10);
         const currentTime = Date.now();
         const twoMinutesInMs = 2 * 60 * 1000;
-        
+
         if (currentTime - dismissedTime >= twoMinutesInMs) {
           localStorage.removeItem('pwa-install-dismissed');
           setIsDismissed(false);
         }
       }
-      
+
       // Re-check if service worker is registered
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistration().then(registration => {
@@ -150,7 +150,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
   const handleInstallClick = async () => {
     // First check if we have a deferred prompt in state
     let promptToUse = deferredPrompt;
-    
+
     // If not in state, check if it's stored in window (captured by early script)
     if (!promptToUse) {
       promptToUse = (window as any).deferredPrompt as BeforeInstallPromptEvent | null;
@@ -158,14 +158,14 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
         setDeferredPrompt(promptToUse);
       }
     }
-    
+
     // If browser prompt is available, use it directly
     if (promptToUse) {
       try {
         await promptToUse.prompt();
         sessionStorage.setItem('pwa-auto-prompt-shown', 'true');
         const choiceResult = await promptToUse.userChoice;
-        
+
         if (choiceResult.outcome === 'accepted') {
           setDeferredPrompt(null);
           (window as any).deferredPrompt = null;
@@ -179,7 +179,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
       }
       return;
     }
-    
+
     // No browser prompt available, show instructions as fallback
     setShowInstructions(true);
   };
@@ -220,7 +220,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
 
   const getInstructions = () => {
     const isAndroid = /Android/.test(navigator.userAgent);
-    
+
     if (isIOS) {
       return {
         title: 'Install on iOS',
@@ -255,10 +255,9 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
 
   return (
     <>
-      <div 
-        className={`w-full relative overflow-hidden rounded-lg transition-all duration-500 ${
-          isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-        }`}
+      <div
+        className={`w-full relative overflow-hidden rounded-lg transition-all duration-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+          }`}
       >
         {/* Compact banner - reduced height */}
         <div className="relative bg-white border border-gray-200 rounded-lg shadow-sm h-16 sm:h-20">
@@ -279,7 +278,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
                 <Download className="w-4 h-4 text-blue-600 flex-shrink-0" />
                 <div className="min-w-0">
                   <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">
-                    Install Dealer Network
+                    Install Uptown Property
                   </h3>
                   <p className="text-xs text-gray-500 truncate">
                     Get faster access on your device
@@ -315,7 +314,7 @@ export function InstallPromptCard({ onDismiss }: InstallPromptCardProps) {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="mb-6">
               <p className="text-sm text-gray-600 mb-4">
                 Follow these steps to install Dealer Network:

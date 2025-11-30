@@ -4,7 +4,6 @@ import { Property } from '../types/property';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useAuth } from '../contexts/AuthContext';
 import type { LeafletMouseEvent } from 'leaflet';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 import { privateLocationIcon, landmarkIcon, getUserLocationIcon } from '../utils/leafletIcons';
@@ -69,24 +68,24 @@ function TileLayerSwitcher({ isSatelliteView }: { isSatelliteView: boolean }) {
 async function geocodeCity(cityName: string): Promise<[number, number] | null> {
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityName + ', Haryana, India')}&limit=1`;
-    
+
     const proxyServices = [
       (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
       (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
     ];
-    
+
     for (const getProxyUrl of proxyServices) {
       try {
         const proxyUrl = getProxyUrl(url);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        
+
         const response = await fetch(proxyUrl, {
           signal: controller.signal,
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         if (response.ok) {
           const data = await response.json();
           const jsonData = typeof data === 'string' ? JSON.parse(data) : data;
@@ -110,24 +109,24 @@ async function searchPlaces(query: string): Promise<Array<{ display_name: string
     if (!query || query.trim().length < 2) {
       return [];
     }
-    
+
     const searchQuery = query.trim();
     const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery + ', India')}&limit=5&addressdetails=1`;
-    
+
     const proxyServices = [
       (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
       (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
       (url: string) => `https://cors-anywhere.herokuapp.com/${url}`,
     ];
-    
+
     for (const getProxyUrl of proxyServices) {
       try {
         const proxyUrl = getProxyUrl(nominatimUrl);
         console.log('Trying proxy:', proxyUrl.substring(0, 50) + '...');
-        
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
-        
+
         const response = await fetch(proxyUrl, {
           method: 'GET',
           headers: {
@@ -135,20 +134,20 @@ async function searchPlaces(query: string): Promise<Array<{ display_name: string
           },
           signal: controller.signal,
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         if (response.ok) {
           const data = await response.json();
           const jsonData = typeof data === 'string' ? JSON.parse(data) : data;
-          
+
           if (Array.isArray(jsonData)) {
             const results = jsonData.map((item: any) => ({
               display_name: item.display_name || item.name || `${item.lat}, ${item.lon}`,
               lat: item.lat?.toString() || '',
               lon: item.lon?.toString() || '',
             })).filter((item: any) => item.lat && item.lon && item.display_name);
-            
+
             if (results.length > 0) {
               console.log('Search successful with proxy, found', results.length, 'results');
               return results;
@@ -166,7 +165,7 @@ async function searchPlaces(query: string): Promise<Array<{ display_name: string
         continue;
       }
     }
-    
+
     console.warn('All proxy services failed. Search is not available due to CORS restrictions.');
     return [];
   } catch (error) {
@@ -274,15 +273,15 @@ async function resolveGoogleMapsUrl(shortUrl: string): Promise<{ coords: [number
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
+
       const response = await fetch(shortUrl, {
         method: 'GET',
         redirect: 'follow',
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       const finalUrl = response.url || shortUrl;
       const urlCoords = extractCoordsFromUrl(finalUrl);
       if (urlCoords) {
@@ -357,12 +356,11 @@ async function parseLocationInput(input: string): Promise<{ coords: [number, num
 }
 
 export function LocationModal({ property, onClose, onSave }: LocationModalProps) {
-  const { user } = useAuth();
-  
+
   const locationField = property.location;
   const landmarkLocationField = property.landmark_location;
   const accuracyField = property.location_accuracy;
-  
+
   useEffect(() => {
     lockBodyScroll();
     return () => {
@@ -411,12 +409,12 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
   const [hasSearched, setHasSearched] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  
+
   const [addLandmark, setAddLandmark] = useState(true);
   // Store the preserved bearing and distance from property to landmark
   const [preservedBearing, setPreservedBearing] = useState<number | null>(null);
   const [preservedDistance, setPreservedDistance] = useState<number | null>(null);
-  
+
   const landmarkDistance = useMemo(() => {
     return Math.floor(Math.random() * (350 - 150 + 1)) + 150;
   }, []);
@@ -428,8 +426,8 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
   useEffect(() => {
     const initializeMapCenter = async () => {
       setIsLoadingCity(true);
-      const cityName = user?.default_city || property.city || 'Panipat';
-      
+      const cityName = property.city || 'Panipat';
+
       const hasCoords = /^-?\d+\.?\d*,-?\d+\.?\d*$/.test((locationField || '').trim());
       if (hasCoords) {
         const parts = locationField!.split(',').map(c => parseFloat(c.trim()));
@@ -439,7 +437,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
           return;
         }
       }
-      
+
       const coords = await geocodeCity(cityName);
       if (coords) {
         setMapCenter(coords);
@@ -451,7 +449,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
     };
 
     initializeMapCenter();
-  }, [user?.default_city, property.city, locationField]);
+  }, [property.city, locationField]);
 
   // Calculate distance between two points in meters
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -461,9 +459,9 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(lat1 * (Math.PI / 180)) *
-        Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
@@ -473,14 +471,14 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
     const dLng = (lng2 - lng1) * (Math.PI / 180);
     const lat1Rad = lat1 * (Math.PI / 180);
     const lat2Rad = lat2 * (Math.PI / 180);
-    
+
     const y = Math.sin(dLng) * Math.cos(lat2Rad);
     const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
-    
+
     let bearing = Math.atan2(y, x);
     bearing = bearing * (180 / Math.PI);
     bearing = (bearing + 360) % 360; // Normalize to 0-360
-    
+
     return bearing;
   };
 
@@ -490,20 +488,20 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
     const bearing = bearingDegrees * (Math.PI / 180);
     const latRad = lat * (Math.PI / 180);
     const lngRad = lng * (Math.PI / 180);
-    
+
     const newLatRad = Math.asin(
       Math.sin(latRad) * Math.cos(distanceMeters / R) +
       Math.cos(latRad) * Math.sin(distanceMeters / R) * Math.cos(bearing)
     );
-    
+
     const newLngRad = lngRad + Math.atan2(
       Math.sin(bearing) * Math.sin(distanceMeters / R) * Math.cos(latRad),
       Math.cos(distanceMeters / R) - Math.sin(latRad) * Math.sin(newLatRad)
     );
-    
+
     const newLat = newLatRad * (180 / Math.PI);
     const newLng = newLngRad * (180 / Math.PI);
-    
+
     return [newLat, newLng];
   };
 
@@ -521,7 +519,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
       if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
         setLandmarkPosition([parts[0], parts[1]]);
         setAddLandmark(true);
-        
+
         // Calculate and preserve bearing and distance from property to landmark
         if (hasCoords) {
           const propertyParts = locationField!.split(',').map(c => parseFloat(c.trim()));
@@ -585,7 +583,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
     }
 
     const trimmed = searchQuery.trim();
-    
+
     if (trimmed.length < 2) {
       setSearchSuggestions([]);
       setShowSuggestions(false);
@@ -597,7 +595,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
     const latLongPattern = /^\s*(-?\d+\.?\d*)\s*[,，]\s*(-?\d+\.?\d*)\s*$/;
     const isCoordinates = latLongPattern.test(trimmed);
     const urlCoords = extractCoordsFromUrl(trimmed);
-    
+
     if (isCoordinates || urlCoords) {
       setShowSuggestions(false);
       setIsSearching(false);
@@ -728,7 +726,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
   }, []);
 
   const radiusSteps = [0, 20, 50, 100, 200, 300, 500, 700, 900, 1100, 1300, 1500, 2000, 5000, 10000, 25000];
-  
+
   const getClosestRadiusStepIndex = (value: number): number => {
     let closestIndex = 0;
     let minDiff = Math.abs(radiusSteps[0] - value);
@@ -849,7 +847,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
 
   const calculateLandmarkLocation = (lat: number, lng: number, distanceMeters: number, direction: string): [number, number] => {
     const R = 6371000;
-    
+
     const directionToBearing: Record<string, number> = {
       'north': 0,
       'northeast': 45,
@@ -860,24 +858,24 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
       'west': 270,
       'northwest': 315,
     };
-    
+
     const bearing = (directionToBearing[direction] || 0) * (Math.PI / 180);
     const latRad = lat * (Math.PI / 180);
     const lngRad = lng * (Math.PI / 180);
-    
+
     const newLatRad = Math.asin(
       Math.sin(latRad) * Math.cos(distanceMeters / R) +
       Math.cos(latRad) * Math.sin(distanceMeters / R) * Math.cos(bearing)
     );
-    
+
     const newLngRad = lngRad + Math.atan2(
       Math.sin(bearing) * Math.sin(distanceMeters / R) * Math.cos(latRad),
       Math.cos(distanceMeters / R) - Math.sin(latRad) * Math.sin(newLatRad)
     );
-    
+
     const newLat = newLatRad * (180 / Math.PI);
     const newLng = newLngRad * (180 / Math.PI);
-    
+
     return [newLat, newLng];
   };
 
@@ -888,7 +886,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
     }
 
     const locationString = `${selectedPosition[0].toFixed(6)},${selectedPosition[1].toFixed(6)}`;
-    
+
     if (addLandmark && landmarkPosition) {
       const landmarkLocationString = `${landmarkPosition[0].toFixed(6)},${landmarkPosition[1].toFixed(6)}`;
       const actualDistance = Math.round(calculateDistance(
@@ -897,7 +895,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
         landmarkPosition[0],
         landmarkPosition[1]
       ));
-      
+
       onSave(locationString, radius.toString(), landmarkLocationString, actualDistance.toString());
     } else {
       onSave(locationString, radius.toString());
@@ -925,118 +923,118 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Search Location
               </label>
-            <div className="relative" ref={searchInputRef}>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSearchSubmit();
-                    }
-                  }}
-                  onPaste={async (e) => {
-                    const pastedText = e.clipboardData.getData('text');
-                    if (pastedText.includes('http') || /^-?\d+\.?\d*,-?\d+\.?\d*$/.test(pastedText.trim())) {
-                      e.preventDefault();
-                      setSearchQuery(pastedText);
-                      setIsSearching(true);
-                      setShowSuggestions(false);
-                      try {
-                        const result = await parseLocationInput(pastedText);
-                        if (result) {
-                          setSelectedPosition(result.coords);
-                          setMapCenter(result.coords);
-                          setMapZoom(16);
-                          if (addLandmark) {
-                            // Use preserved bearing and distance if available, otherwise use random values
-                            if (preservedBearing !== null && preservedDistance !== null) {
-                              const [landmarkLat, landmarkLng] = calculateLandmarkFromBearing(
-                                result.coords[0],
-                                result.coords[1],
-                                preservedBearing,
-                                preservedDistance
-                              );
-                              setLandmarkPosition([landmarkLat, landmarkLng]);
-                            } else {
-                              const [landmarkLat, landmarkLng] = calculateLandmarkLocation(
-                                result.coords[0],
-                                result.coords[1],
-                                landmarkDistance,
-                                landmarkDirection
-                              );
-                              setLandmarkPosition([landmarkLat, landmarkLng]);
-                            }
-                          }
-                          if (result.displayText) {
-                            setSearchQuery(result.displayText);
-                          } else {
-                            setSearchQuery('');
-                          }
-                        } else {
-                          setSearchQuery(pastedText);
-                        }
-                      } catch (error) {
-                        console.error('Paste error:', error);
-                        setSearchQuery(pastedText);
-                      } finally {
-                        setIsSearching(false);
+              <div className="relative" ref={searchInputRef}>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSearchSubmit();
                       }
-                    }
-                  }}
-                  placeholder="Search for a place, paste coordinates (lat,long), or paste a Google Maps URL"
-                  className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
-                />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                {isSearching && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                    }}
+                    onPaste={async (e) => {
+                      const pastedText = e.clipboardData.getData('text');
+                      if (pastedText.includes('http') || /^-?\d+\.?\d*,-?\d+\.?\d*$/.test(pastedText.trim())) {
+                        e.preventDefault();
+                        setSearchQuery(pastedText);
+                        setIsSearching(true);
+                        setShowSuggestions(false);
+                        try {
+                          const result = await parseLocationInput(pastedText);
+                          if (result) {
+                            setSelectedPosition(result.coords);
+                            setMapCenter(result.coords);
+                            setMapZoom(16);
+                            if (addLandmark) {
+                              // Use preserved bearing and distance if available, otherwise use random values
+                              if (preservedBearing !== null && preservedDistance !== null) {
+                                const [landmarkLat, landmarkLng] = calculateLandmarkFromBearing(
+                                  result.coords[0],
+                                  result.coords[1],
+                                  preservedBearing,
+                                  preservedDistance
+                                );
+                                setLandmarkPosition([landmarkLat, landmarkLng]);
+                              } else {
+                                const [landmarkLat, landmarkLng] = calculateLandmarkLocation(
+                                  result.coords[0],
+                                  result.coords[1],
+                                  landmarkDistance,
+                                  landmarkDirection
+                                );
+                                setLandmarkPosition([landmarkLat, landmarkLng]);
+                              }
+                            }
+                            if (result.displayText) {
+                              setSearchQuery(result.displayText);
+                            } else {
+                              setSearchQuery('');
+                            }
+                          } else {
+                            setSearchQuery(pastedText);
+                          }
+                        } catch (error) {
+                          console.error('Paste error:', error);
+                          setSearchQuery(pastedText);
+                        } finally {
+                          setIsSearching(false);
+                        }
+                      }
+                    }}
+                    placeholder="Search for a place, paste coordinates (lat,long), or paste a Google Maps URL"
+                    className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                  />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                    </div>
+                  )}
+                </div>
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {searchSuggestions.map((suggestion, index) => (
+                      <button
+                        key={`suggestion-${index}-${suggestion.lat}-${suggestion.lon}`}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSuggestionSelect(suggestion);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none border-b border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                          <span className="text-sm text-gray-700">{suggestion.display_name}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {isSearching && searchQuery.trim().length >= 2 && !showSuggestions && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <span>Searching...</span>
+                    </div>
+                  </div>
+                )}
+                {!isSearching && hasSearched && searchQuery.trim().length >= 2 && searchSuggestions.length === 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+                    <div className="text-sm text-gray-500 mb-1">No results found for "{searchQuery}"</div>
+                    <div className="text-xs text-gray-400">Try clicking on the map or pasting coordinates directly (e.g., 28.7041,77.1025)</div>
                   </div>
                 )}
               </div>
-              {showSuggestions && searchSuggestions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {searchSuggestions.map((suggestion, index) => (
-                    <button
-                      key={`suggestion-${index}-${suggestion.lat}-${suggestion.lon}`}
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleSuggestionSelect(suggestion);
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none border-b border-gray-100 last:border-b-0 transition-colors"
-                    >
-                      <div className="flex items-start gap-2">
-                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm text-gray-700">{suggestion.display_name}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {isSearching && searchQuery.trim().length >= 2 && !showSuggestions && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    <span>Searching...</span>
-                  </div>
-                </div>
-              )}
-              {!isSearching && hasSearched && searchQuery.trim().length >= 2 && searchSuggestions.length === 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
-                  <div className="text-sm text-gray-500 mb-1">No results found for "{searchQuery}"</div>
-                  <div className="text-xs text-gray-400">Try clicking on the map or pasting coordinates directly (e.g., 28.7041,77.1025)</div>
-                </div>
-              )}
+              <p className="text-xs text-gray-500 mt-1.5">
+                Search for places, paste coordinates (e.g., 28.7041,77.1025), or paste Google Maps URLs.
+                If search doesn't work, click on the map to select location directly.
+              </p>
             </div>
-            <p className="text-xs text-gray-500 mt-1.5">
-              Search for places, paste coordinates (e.g., 28.7041,77.1025), or paste Google Maps URLs. 
-              If search doesn't work, click on the map to select location directly.
-            </p>
-          </div>
           )}
 
           <div>
@@ -1070,7 +1068,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
                     <MapCenterUpdater center={mapCenter} zoom={mapZoom} />
                     <TileLayerSwitcher isSatelliteView={isSatelliteView} />
                     <MapClickHandler onMapClick={handleMapClick} />
-                    
+
                     {selectedPosition && landmarkPosition && (
                       <Polyline
                         positions={[selectedPosition, landmarkPosition]}
@@ -1082,7 +1080,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
                         }}
                       />
                     )}
-                    
+
                     {selectedPosition && (
                       <>
                         {radius > 0 && (
@@ -1148,7 +1146,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
                         </Marker>
                       </>
                     )}
-                    
+
                     {landmarkPosition && addLandmark && (
                       <Marker
                         position={landmarkPosition}
@@ -1177,7 +1175,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
                             }
                           },
                         }}
-                         icon={landmarkIcon}
+                        icon={landmarkIcon}
                       >
                         <Popup>
                           <div className="flex items-center gap-2">
@@ -1201,7 +1199,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
                       </Marker>
                     )}
                   </MapContainer>
-                  
+
                   <div className="absolute inset-0 pointer-events-none z-[2]">
                     <button
                       type="button"
@@ -1210,15 +1208,14 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
                         setIsSatelliteView(newView);
                         localStorage.setItem('mapViewPreference', newView ? 'satellite' : 'map');
                       }}
-                      className={`absolute top-2 right-2 pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg shadow-lg transition-colors ${
-                        isSatelliteView
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                      }`}
+                      className={`absolute top-2 right-2 pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold rounded-lg shadow-lg transition-colors ${isSatelliteView
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                        }`}
                       title={isSatelliteView ? 'Switch to Map View' : 'Switch to Satellite View'}
                     >
-                      <Satellite 
-                        className="w-4 h-4 flex-shrink-0" 
+                      <Satellite
+                        className="w-4 h-4 flex-shrink-0"
                         strokeWidth={2.5}
                       />
                       <span className="hidden sm:inline">{isSatelliteView ? 'Satellite' : 'Map'}</span>
@@ -1231,8 +1228,8 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
                       className="absolute bottom-2 right-2 pointer-events-auto flex items-center justify-center w-10 h-10 bg-white text-blue-600 hover:bg-blue-50 rounded-lg shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
                       title="Get Current Location"
                     >
-                      <Navigation 
-                        className={`w-5 h-5 flex-shrink-0 ${isGettingLocation ? 'animate-spin' : ''}`} 
+                      <Navigation
+                        className={`w-5 h-5 flex-shrink-0 ${isGettingLocation ? 'animate-spin' : ''}`}
                         strokeWidth={2.5}
                       />
                     </button>
@@ -1246,7 +1243,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
                   <span className="font-semibold">Exact Location:</span> {selectedPosition[0].toFixed(6)}, {selectedPosition[1].toFixed(6)}
                   {landmarkPosition && addLandmark && (
                     <>
-                   <span className="text-gray-500"> | </span>
+                      <span className="text-gray-500"> | </span>
                       <span className="font-semibold">Landmark Location:</span> {landmarkPosition[0].toFixed(6)}, {landmarkPosition[1].toFixed(6)}
                       <span className="text-gray-500"> | </span>
                       <span className="font-semibold">Distance:</span> {Math.round(calculateDistance(
@@ -1259,7 +1256,7 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
                   )}
                 </>
               ) : (
-                <>Click anywhere on the map to set the location. The map is centered on {user?.default_city || property.city || 'Panipat'}.</>
+                <>Click anywhere on the map to set the location. The map is centered on {property.city || 'Panipat'}.</>
               )}
             </p>
           </div>
@@ -1277,9 +1274,9 @@ export function LocationModal({ property, onClose, onSave }: LocationModalProps)
               onChange={(e) => handleRadiusChange(parseInt(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
             />
-          
+
             <p className="text-xs text-gray-500 mt-1.5">
-              This radius indicates the accuracy of the exact location. 
+              This radius indicates the accuracy of the exact location.
             </p>
           </div>
 

@@ -2,10 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Filter, X, ChevronDown, MapPin } from 'lucide-react';
 import { FilterOptions } from '../types/property';
 import { getUserSettings } from '../types/userSettings';
-import { useAuth } from '../contexts/AuthContext';
+
 import {
   STORAGE_KEYS,
-  SEARCH_COLUMNS,
   PROPERTY_TYPE_OPTIONS,
   SIZE_UNIT_OPTIONS,
   getSearchColumnsSortedByUsage,
@@ -15,7 +14,7 @@ import {
   getCityOptions,
   getCityOptionsWithLabels,
 } from '../utils/filterOptions';
-import { getAreaCityData, getCities, getAllAreas, getAreasForCity, fetchAreaCityDataInBackground, updateCacheWithCityArea } from '../utils/areaCityApi';
+import { getAreaCityData, getAllAreas, getAreasForCity, fetchAreaCityDataInBackground } from '../utils/areaCityApi';
 import { RangeSlider } from './RangeSlider';
 import { MultiSelect } from './MultiSelect';
 
@@ -25,8 +24,8 @@ interface SearchFilterProps {
 }
 
 export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
-  const { user } = useAuth();
-  
+
+
   // Load persisted state from localStorage
   const loadPersistedState = () => {
     try {
@@ -35,7 +34,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
       const savedFilters = localStorage.getItem(STORAGE_KEYS.FILTERS);
       const savedArea = localStorage.getItem(STORAGE_KEYS.SELECTED_AREA) || '';
       const userSettings = getUserSettings();
-      
+
       // Use user settings as defaults if no saved filters
       // City should always be selected: saved city, user's default_city, or Panipat as fallback
       let parsedFilters: FilterOptions = {};
@@ -52,19 +51,19 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
           parsedFilters.highlights = parsedFilters.highlights.split(',');
         }
       }
-      
+
       // Determine default city: saved city, user's default_city from auth context, userSettings.city, or Panipat
       // Note: user might not be loaded yet, so we use fallback to 'Panipat'
-      const userCity = user?.default_city || userSettings.city || 'Panipat';
+      const userCity = userSettings.city || 'Panipat';
       // Always ensure city is set - use saved city, or default to user's city or Panipat
       const defaultCity = parsedFilters.city || userCity;
-      
+
       // Default price and size ranges
       const defaultPriceMin = parsedFilters.min_price ?? 0;
       const defaultPriceMax = parsedFilters.max_price ?? 1000; // 1000 lakhs (10 crores) max
       const defaultSizeMin = parsedFilters.size_min ?? 0;
       const defaultSizeMax = parsedFilters.max_size ?? 10000; // Max size depends on unit
-      
+
       const defaultFilters: FilterOptions = savedFilters ? {
         ...parsedFilters,
         city: defaultCity, // Always set city - use saved city or default
@@ -82,7 +81,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
         max_size: defaultSizeMax,
         size_unit: userSettings.defaultSizeUnit || 'Gaj',
       };
-      
+
       return {
         query: savedQuery,
         column: savedColumn,
@@ -92,7 +91,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
     } catch {
       const userSettings = getUserSettings();
       // City should always be selected: user's default_city from auth context, userSettings.city, or Panipat as fallback
-      const userCity = user?.default_city || userSettings.city || 'Panipat';
+      const userCity = userSettings.city || 'Panipat';
       return {
         query: '',
         column: 'general',
@@ -128,7 +127,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   const [filters, setFilters] = useState<FilterOptions>(persistedState.filters);
   const filterDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMountRef = useRef(true); // Track if this is the initial mount
-  
+
   // Mark initial mount as complete after a short delay to allow all effects to skip on mount
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -136,17 +135,15 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
     }, 100); // Short delay to ensure all mount effects have run
     return () => clearTimeout(timer);
   }, []);
-  
+
   // Dynamic city and area options from API
-  const [cityOptions, setCityOptions] = useState<string[]>([]);
-  const [cityOptionsWithLabels, setCityOptionsWithLabels] = useState<Array<{value: string; label: string}>>([]);
-  const [areaOptions, setAreaOptions] = useState<string[]>([]);
+  const [cityOptionsWithLabels, setCityOptionsWithLabels] = useState<Array<{ value: string; label: string }>>([]);
   const [filteredAreaOptions, setFilteredAreaOptions] = useState<string[]>([]);
-  
+
   // Dynamic highlight and tag options from API
-  const [highlightOptions, setHighlightOptions] = useState<Array<{value: string; label: string}>>([]);
-  const [tagOptions, setTagOptions] = useState<Array<{value: string; label: string}>>([]);
-  
+  const [highlightOptions, setHighlightOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [tagOptions, setTagOptions] = useState<Array<{ value: string; label: string }>>([]);
+
   // Range values for sliders
   const [priceRange, setPriceRange] = useState<[number, number]>([
     filters.min_price ?? 0,
@@ -156,7 +153,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
     filters.size_min ?? 0,
     filters.max_size ?? 10000
   ]);
-  
+
   // Multi-select values
   const [selectedTypes, setSelectedTypes] = useState<string[]>(
     Array.isArray(filters.type) ? filters.type : filters.type ? [filters.type] : []
@@ -172,24 +169,22 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   useEffect(() => {
     // Fetch in background
     fetchAreaCityDataInBackground();
-    
+
     // Load cached data immediately
     getAreaCityData().then((data) => {
       if (data) {
         const cities = data.cities.map((c) => c.city);
-        setCityOptions(cities);
+
         setCityOptionsWithLabels(cities.map((city) => ({ value: city, label: city })));
         // Get all areas for fallback (stored in areaOptions, not filteredAreaOptions)
-        getAllAreas().then((areas) => {
-          setAreaOptions(areas);
-        });
+
       }
     });
-    
+
     // Fetch city options from API
     getCityOptions().then((cities) => {
       if (cities && cities.length > 0) {
-        setCityOptions(cities);
+
         getCityOptionsWithLabels().then((cityOptionsWithLabels) => {
           setCityOptionsWithLabels(cityOptionsWithLabels);
         });
@@ -197,14 +192,14 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
     }).catch((error) => {
       console.error('Failed to load city options:', error);
     });
-    
+
     // Fetch highlight and tag options
     getHighlightOptions().then((highlights) => {
       setHighlightOptions(highlights.map((h) => ({ value: h, label: h })));
     }).catch((error) => {
       console.error('Failed to load highlight options:', error);
     });
-    
+
     getTagOptions().then((tags) => {
       setTagOptions(tags.map((t) => ({ value: t, label: t })));
     }).catch((error) => {
@@ -220,7 +215,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
       setFilteredAreaOptions([]);
       return;
     }
-    
+
     // Fetch areas for the selected city
     const fetchCityAreas = async () => {
       try {
@@ -248,7 +243,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
         }
       }
     };
-    
+
     // Clear areas first, then fetch
     setFilteredAreaOptions([]);
     fetchCityAreas();
@@ -257,12 +252,12 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
-      
+
       // Check if click is inside any dropdown - if so, don't close
       if (columnDropdownRef.current?.contains(target)) return;
       if (areaDropdownRef.current?.contains(target)) return;
       // Note: sizeUnitDropdown is now a native select, so no need to handle it here
-      
+
       // Only close if clicking outside all dropdowns
       setShowColumnDropdown(false);
       setShowAreaDropdown(false);
@@ -303,7 +298,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
     if (isInitialMountRef.current) {
       return;
     }
-    
+
     const timer = setTimeout(() => {
       onSearch(searchQuery, searchColumn || undefined);
       // Track column usage when search is performed (only if there's a query)
@@ -353,16 +348,16 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   // Handle city selection - simple and direct
   const handleCitySelect = (cityValue: string) => {
     // Ensure city is never empty - use fallback if empty
-    const validCity = cityValue || user?.default_city || 'Panipat';
-    
+    const validCity = cityValue || 'Panipat';
+
     // Update state using functional update to ensure we have latest state
     setFilters(prevFilters => {
       const cityChanged = validCity !== prevFilters.city;
-      const newFilters: FilterOptions = { 
-        ...prevFilters, 
-        city: validCity 
+      const newFilters: FilterOptions = {
+        ...prevFilters,
+        city: validCity
       };
-      
+
       // Clear area if city changed
       if (cityChanged) {
         newFilters.area = '';
@@ -371,13 +366,13 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
         // Note: The useEffect that watches filters.city will handle fetching areas
         // We don't need to manually fetch here to avoid duplicate work
       }
-      
+
       // Save to localStorage
       localStorage.setItem(STORAGE_KEYS.FILTERS, JSON.stringify(newFilters));
-      
+
       // Apply filters
       applyFiltersDebounced(newFilters);
-      
+
       return newFilters;
     });
   };
@@ -388,10 +383,10 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
     if (filterDebounceTimerRef.current) {
       clearTimeout(filterDebounceTimerRef.current);
     }
-    
+
     // Clean filters: remove empty strings, undefined, empty arrays, and ranges at min/max
     const cleanFilters: FilterOptions = {};
-    
+
     // Check price range - only include if not at both endpoints
     const minPrice = newFilters.min_price ?? 0;
     const maxPrice = newFilters.max_price ?? 1000;
@@ -400,7 +395,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
       cleanFilters.min_price = minPrice;
       cleanFilters.max_price = maxPrice;
     }
-    
+
     // Check size range - only include if not at both endpoints
     const minSize = newFilters.size_min ?? 0;
     const maxSize = newFilters.max_size ?? 10000;
@@ -409,23 +404,23 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
       cleanFilters.size_min = minSize;
       cleanFilters.max_size = maxSize;
     }
-    
+
     // Always include city first (before processing other filters)
     // City should always be set - use user's default_city or Panipat as fallback
     if (newFilters.city) {
       cleanFilters.city = newFilters.city;
     } else {
       // If city is not set, use user's default_city from auth context or Panipat
-      cleanFilters.city = user?.default_city || 'Panipat';
+      cleanFilters.city = 'Panipat';
     }
-    
+
     // Process other filters
     for (const [key, value] of Object.entries(newFilters)) {
       // Skip price and size range as we've already handled them
       if (['min_price', 'max_price', 'size_min', 'max_size', 'city'].includes(key)) continue;
-      
+
       if (value === undefined || value === '') continue;
-      
+
       // Handle arrays - only include if not empty
       if (Array.isArray(value)) {
         if (value.length > 0) {
@@ -433,31 +428,31 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
         }
         continue;
       }
-      
+
       cleanFilters[key as keyof FilterOptions] = value;
     }
-    
+
     // Include size_unit if size range is applied (to tell backend what unit the range is in)
     if (isSizeRangeApplied && newFilters.size_unit) {
       cleanFilters.size_unit = newFilters.size_unit;
     }
-    
+
     // filter_size_unit is separate and should be included if set (for filtering by size unit)
     if (newFilters.filter_size_unit) {
       cleanFilters.filter_size_unit = newFilters.filter_size_unit;
     }
-    
+
     // Debounce filter application
     filterDebounceTimerRef.current = setTimeout(() => {
       onFilter(cleanFilters);
     }, 300);
   };
-  
+
   // Ensure city is always set - update when user context loads (after applyFiltersDebounced is defined)
   useEffect(() => {
     const currentCity = filters.city;
-    const userCity = user?.default_city;
-    
+    const userCity = undefined;
+
     // Skip on initial mount - App component's initial load effect handles applying filters from localStorage
     if (isInitialMountRef.current) {
       // Still ensure city is set in state (but don't trigger filter API call)
@@ -479,7 +474,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
       }
       return;
     }
-    
+
     // After initial mount, apply filters when city changes
     // Only update if city is empty and we have a user default_city
     // Or if city is 'Panipat' (the default) and user has a different default_city
@@ -501,7 +496,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
         return newFilters;
       });
     }
-  }, [user?.default_city, filters.city]); // Run when user's default_city changes or filters.city changes
+  }, [filters.city]); // Run when filters.city changes
 
   const handleFilterChange = (key: keyof FilterOptions, value: string | number | string[] | boolean | undefined) => {
     // If clearing city, set it back to default (city should always be selected)
@@ -509,16 +504,16 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
     if (key === 'city') {
       // Ensure city is never empty - use user's default_city or Panipat as fallback
       if (typeof value === 'string') {
-        const validCity = value || user?.default_city || 'Panipat';
+        const validCity = value || 'Panipat';
         handleCitySelect(validCity);
       } else {
         // If value is empty/undefined, use default
-        const defaultCity = user?.default_city || 'Panipat';
+        const defaultCity = 'Panipat';
         handleCitySelect(defaultCity);
       }
       return;
     }
-    
+
     // For all other filters, only update local state - don't apply immediately
     // If clearing sortby, also clear order
     if (key === 'sortby' && (value === '' || value === undefined)) {
@@ -528,20 +523,20 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
       // Don't apply filters immediately - wait for Apply button
       return;
     }
-    
+
     // If setting sortby and order is not set, default to DESC
     if (key === 'sortby' && typeof value === 'string' && value && !filters.order) {
-      const newFilters: FilterOptions = { 
-        ...filters, 
-        sortby: value as FilterOptions['sortby'], 
-        order: 'DESC' 
+      const newFilters: FilterOptions = {
+        ...filters,
+        sortby: value as FilterOptions['sortby'],
+        order: 'DESC'
       };
       setFilters(newFilters);
       localStorage.setItem(STORAGE_KEYS.FILTERS, JSON.stringify(newFilters));
       // Don't apply filters immediately - wait for Apply button
       return;
     }
-    
+
     const newFilters: FilterOptions = { ...filters, [key]: value as any };
     setFilters(newFilters);
     // Auto-save to localStorage
@@ -558,8 +553,8 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   // Handle price range change - only update local state, don't apply filters
   const handlePriceRangeChange = (range: [number, number]) => {
     setPriceRange(range);
-    const newFilters = { 
-      ...filters, 
+    const newFilters = {
+      ...filters,
       min_price: range[0],
       max_price: range[1]
     };
@@ -571,8 +566,8 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   // Handle size range change - only update local state, don't apply filters
   const handleSizeRangeChange = (range: [number, number]) => {
     setSizeRange(range);
-    const newFilters = { 
-      ...filters, 
+    const newFilters = {
+      ...filters,
       size_min: range[0],
       max_size: range[1]
     };
@@ -584,8 +579,8 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   // Handle type multi-select - only update local state, don't apply filters
   const handleTypeChange = (types: string[]) => {
     setSelectedTypes(types);
-    const newFilters = { 
-      ...filters, 
+    const newFilters = {
+      ...filters,
       type: types.length > 0 ? types : undefined
     };
     setFilters(newFilters);
@@ -596,8 +591,8 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   // Handle tags multi-select - only update local state, don't apply filters
   const handleTagsChange = (tags: string[]) => {
     setSelectedTags(tags);
-    const newFilters = { 
-      ...filters, 
+    const newFilters = {
+      ...filters,
       tags: tags.length > 0 ? tags : undefined
     };
     setFilters(newFilters);
@@ -608,8 +603,8 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   // Handle highlights multi-select - only update local state, don't apply filters
   const handleHighlightsChange = (highlights: string[]) => {
     setSelectedHighlights(highlights);
-    const newFilters = { 
-      ...filters, 
+    const newFilters = {
+      ...filters,
       highlights: highlights.length > 0 ? highlights : undefined
     };
     setFilters(newFilters);
@@ -677,35 +672,35 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
   // Count active filters excluding city (city is always selected, so it doesn't count as a filter)
   const activeFilterCount = (() => {
     let count = 0;
-    
+
     // Check price range
     const minPrice = filters.min_price ?? 0;
     const maxPrice = filters.max_price ?? 1000;
     if (!(minPrice === 0 && maxPrice === 1000)) {
       count++; // Count price range as one filter
     }
-    
+
     // Check size range
     const minSize = filters.size_min ?? 0;
     const maxSize = filters.max_size ?? 10000;
     if (!(minSize === 0 && maxSize === 10000)) {
       count++; // Count size range as one filter
     }
-    
+
     // Count other filters
     for (const [key, value] of Object.entries(filters)) {
       if (key === 'city') continue;
       // Skip range filters as we've already counted them
       if (['min_price', 'max_price', 'size_min', 'max_size'].includes(key)) continue;
-      
+
       if (value === '' || value === undefined) continue;
-      
+
       // Handle arrays
       if (Array.isArray(value)) {
         if (value.length > 0) count++;
         continue;
       }
-      
+
       count++;
     }
     return count;
@@ -736,7 +731,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
         <div className="relative flex-1 flex">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
-              <input
+            <input
               type="text"
               placeholder={`Search in ${selectedColumnLabel.toLowerCase()}...`}
               value={searchQuery}
@@ -770,11 +765,10 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                       trackColumnUsage(column.value); // Track usage when column is selected
                       setShowColumnDropdown(false);
                     }}
-                    className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm transition-colors ${
-                      searchColumn === column.value
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
+                    className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm transition-colors ${searchColumn === column.value
+                      ? 'bg-blue-50 text-blue-700 font-medium'
+                      : 'text-gray-700 hover:bg-gray-50'
+                      }`}
                   >
                     {column.label}
                   </button>
@@ -814,51 +808,50 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
       {showAreaSection && (
         <div className="flex gap-1.5 sm:gap-2 w-full">
           <div className="relative flex-1" ref={areaDropdownRef}>
-          <button
-            type="button"
-            onClick={() => setShowAreaDropdown(!showAreaDropdown)}
-            className="w-full h-9 sm:h-10 px-3 sm:px-4 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-between text-xs sm:text-sm font-medium text-gray-700"
-          >
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-              <span>{selectedArea || 'Select Area'}</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              {selectedArea && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAreaClear();
-                  }}
-                  className="p-0.5 sm:p-1 hover:bg-gray-200 rounded"
-                >
-                  <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
-                </button>
-              )}
-              <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${showAreaDropdown ? 'rotate-180' : ''}`} />
-            </div>
-          </button>
-          {showAreaDropdown && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto z-50">
-              {(filters.city && filteredAreaOptions.length > 0 
-                ? filteredAreaOptions 
-                : []).map((area, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleAreaSelect(area)}
-                  className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm transition-colors ${
-                    selectedArea === area
-                      ? 'bg-blue-50 text-blue-700 font-medium'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {area}
-                </button>
-              ))}
-            </div>
-          )}
+            <button
+              type="button"
+              onClick={() => setShowAreaDropdown(!showAreaDropdown)}
+              className="w-full h-9 sm:h-10 px-3 sm:px-4 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-between text-xs sm:text-sm font-medium text-gray-700"
+            >
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                <span>{selectedArea || 'Select Area'}</span>
+              </div>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                {selectedArea && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAreaClear();
+                    }}
+                    className="p-0.5 sm:p-1 hover:bg-gray-200 rounded"
+                  >
+                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
+                  </button>
+                )}
+                <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${showAreaDropdown ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+            {showAreaDropdown && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto z-50">
+                {(filters.city && filteredAreaOptions.length > 0
+                  ? filteredAreaOptions
+                  : []).map((area, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleAreaSelect(area)}
+                      className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm transition-colors ${selectedArea === area
+                        ? 'bg-blue-50 text-blue-700 font-medium'
+                        : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                    >
+                      {area}
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -887,7 +880,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                         Area/Address
                       </label>
                       <select
-                        value={filters.city || user?.default_city || 'Panipat'}
+                        value={filters.city || 'Panipat'}
                         onChange={(e) => {
                           handleCitySelect(e.target.value);
                         }}
@@ -915,23 +908,23 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                       <MapPin className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                       {showAreaSuggestions && (
                         <div className="absolute z-[70] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                          {(filters.city && filteredAreaOptions.length > 0 
-                            ? filteredAreaOptions 
+                          {(filters.city && filteredAreaOptions.length > 0
+                            ? filteredAreaOptions
                             : []).filter(area =>
-                            area.toLowerCase().includes((filters.area || '').toLowerCase())
-                          ).map((area, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => {
-                                handleFilterChange('area', area);
-                                setShowAreaSuggestions(false);
-                              }}
-                              className="w-full px-3 py-1.5 text-left hover:bg-blue-50 text-xs text-gray-700"
-                            >
-                              {area}
-                            </button>
-                          ))}
+                              area.toLowerCase().includes((filters.area || '').toLowerCase())
+                            ).map((area, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  handleFilterChange('area', area);
+                                  setShowAreaSuggestions(false);
+                                }}
+                                className="w-full px-3 py-1.5 text-left hover:bg-blue-50 text-xs text-gray-700"
+                              >
+                                {area}
+                              </button>
+                            ))}
                         </div>
                       )}
                     </div>
@@ -998,7 +991,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                     <span>Additional</span>
                     <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showAdditionalFilters ? 'rotate-180' : ''}`} />
                   </button>
-                  
+
                   {showAdditionalFilters && (
                     <div className="space-y-3 pt-2">
                       {/* Tags - Multi-select */}
@@ -1143,19 +1136,19 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                   <label className="block text-xs font-semibold text-gray-700">
                     Area/Address
                   </label>
-                    <select
-                      value={filters.city || user?.default_city || 'Panipat'}
-                      onChange={(e) => {
-                        handleCitySelect(e.target.value);
-                      }}
-                      className="px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                    >
-                      {cityOptionsWithLabels.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                  <select
+                    value={filters.city || 'Panipat'}
+                    onChange={(e) => {
+                      handleCitySelect(e.target.value);
+                    }}
+                    className="px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  >
+                    {cityOptionsWithLabels.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {/* Area Input */}
                 <div className="relative">
@@ -1172,23 +1165,23 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                   <MapPin className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                   {showAreaSuggestions && (
                     <div className="absolute z-[70] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                      {(filters.city && filteredAreaOptions.length > 0 
-                        ? filteredAreaOptions 
+                      {(filters.city && filteredAreaOptions.length > 0
+                        ? filteredAreaOptions
                         : []).filter(area =>
-                        area.toLowerCase().includes((filters.area || '').toLowerCase())
-                      ).map((area, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            handleFilterChange('area', area);
-                            setShowAreaSuggestions(false);
-                          }}
-                          className="w-full px-3 py-1.5 text-left hover:bg-blue-50 text-xs text-gray-700"
-                        >
-                          {area}
-                        </button>
-                      ))}
+                          area.toLowerCase().includes((filters.area || '').toLowerCase())
+                        ).map((area, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              handleFilterChange('area', area);
+                              setShowAreaSuggestions(false);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-blue-50 text-xs text-gray-700"
+                          >
+                            {area}
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -1254,7 +1247,7 @@ export function SearchFilter({ onSearch, onFilter }: SearchFilterProps) {
                 <span>Additional</span>
                 <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showAdditionalFilters ? 'rotate-180' : ''}`} />
               </button>
-              
+
               {showAdditionalFilters && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                   {/* Tags - Multi-select */}

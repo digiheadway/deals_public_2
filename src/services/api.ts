@@ -1,55 +1,21 @@
 import axios from 'axios';
 import { Property, PropertyFormData, FilterOptions } from '../types/property';
-import { getStoredToken, clearStoredToken } from './authApi';
-import { logoutUser } from '../types/user';
+
 
 // API endpoints based on read_me.md structure
 const FETCH_API_URL = 'https://prop.digiheadway.in/api/dealer_network/fetch-public.php';
 const ACTION_API_URL = 'https://prop.digiheadway.in/api/dealer_network/action.php';
 
 // Function to handle authentication errors
-function handleAuthError() {
-  // Clear all auth data
-  clearStoredToken();
-  logoutUser();
 
-  // Redirect to login page
-  // Use window.location to ensure full page reload and clear any state
-  if (window.location.pathname !== '/login' && !window.location.pathname.startsWith('/property/')) {
-    window.location.href = '/login';
-  }
-}
 
+// Add axios response interceptor to handle authentication errors globally
 // Add axios response interceptor to handle authentication errors globally
 axios.interceptors.response.use(
   (response) => {
-    // Check if response data contains an authentication error
-    if (response.data && typeof response.data === 'object' && 'error' in response.data) {
-      const errorMessage = response.data.error || '';
-      if (errorMessage.toLowerCase().includes('authentication required') ||
-        errorMessage.toLowerCase().includes('invalid token')) {
-        handleAuthError();
-        return Promise.reject(new Error(errorMessage));
-      }
-    }
     return response;
   },
   (error) => {
-    // Handle HTTP error responses
-    if (error.response) {
-      const errorData = error.response.data;
-      if (errorData && typeof errorData === 'object' && 'error' in errorData) {
-        const errorMessage = errorData.error || '';
-        if (errorMessage.toLowerCase().includes('authentication required') ||
-          errorMessage.toLowerCase().includes('invalid token')) {
-          handleAuthError();
-        }
-      }
-      // Also check for 401/403 status codes
-      if (error.response.status === 401 || error.response.status === 403) {
-        handleAuthError();
-      }
-    }
     return Promise.reject(error);
   }
 );
@@ -66,11 +32,8 @@ function validateOwnerId(ownerId: number): void {
 }
 
 // Get authorization headers with Bearer token
+// Get authorization headers with Bearer token
 function getAuthHeaders(): { Authorization?: string } {
-  const token = getStoredToken();
-  if (token) {
-    return { Authorization: `Bearer ${token}` };
-  }
   return {};
 }
 
